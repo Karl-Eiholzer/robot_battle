@@ -9,4 +9,6 @@ Check code in
 
 DripBoolean is a Nerd
 
-Engoth is a Nerd
+Engoth is a cool dude
+
+Karl Eihlzere sucks and is a Nerd
