@@ -6,3 +6,5 @@ the game is a Tactical Fantasy RPG, turn-based and in 2D.
 ## How to help development
 
 Check code in
+
+DripBoolean is a Nerd
