@@ -1,6 +1,7 @@
-# RPG Tactical Fantasy Game
+# RPG Tactical Fantasy Game - Robot Battle
+## Fast Simultaneous Turn Strategic Game
 
-he game is a Tactical Fantasy RPG, turn-based and in 2D.
+the game is a Tactical Fantasy RPG, turn-based and in 2D.
 
 ## How to help development
 
