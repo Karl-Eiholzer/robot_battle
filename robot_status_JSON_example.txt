@@ -3,6 +3,10 @@
 # not sure start and end positions are needed, but could facilitate cool rendering options
 
 {
+    "game_status": {
+        "game_over": "N",
+        "winner": "None"
+    }
     "my_robots": {
         "robot_id": "1",
 		   "position": {
