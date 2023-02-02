@@ -1,0 +1,52 @@
+# example of a JSON package coming back from the server to set the game state of all my_robots
+# for the players robots (my_robots) the health statistics are included
+# not sure start and end positions are needed, but could facilitate cool rendering options
+
+{
+    "game_status": {
+        "game_over": "N",
+        "winner": "None"
+    }
+    "my_robots": {
+        "robot_id": "1",
+		   "position": {
+            "start_pos": [13, 5, 4],
+            "end_pos": [10, 3, 7]
+                   },
+       "status":   {
+            "active": "Y",
+            "attack_armor_health": [2, 4, 10]
+                   }
+              },
+              {
+          "robot_id": "2",
+          "position": {
+              "start_pos": [12, 4, 3],
+              "end_pos": [13, 5, 8]
+                      },
+          "status":   {
+              "active": "N",
+              "attack_armor_health": [0, 0, 0]
+                     }
+              },
+        "enemy_robots": {
+           "robot_id": "7",
+    		   "position": {
+                "start_pos": [14, 2, 1],
+                "end_pos": [14, 2, 1]
+                       },
+           "status":   {
+                "active": "Y"
+                       }
+                  },
+                  {
+              "robot_id": "8",
+              "position": {
+                  "start_pos": [2, 14, 1],
+                  "end_pos": [2, 16, 15]
+                          },
+              "status":   {
+                  "active": "Y"
+                         }
+                  }
+}
