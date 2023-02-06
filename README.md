@@ -40,3 +40,59 @@ multi-player with web server resolving turn actions between clients
 
 ***Return to Phase 1***
 * if end game actions not triggered
+
+
+## Movement Conflict Resolution Rules
+
+***Player actions***
+* at the start of a turn each player is given four points to allocate to attack and defense across your entire team (For example, you could add 4 points to a single robot's armor, or 1 point each to all three's armor plus one to one of the robot's attacks)
+* each robot must try to make two moves per turn
+
+***Attack, defense, and Health***
+* when two robot attempt to enter the same hex on the same move, they battle
+* the robot deals damage equal to their attack points
+* damage is first applied against armor, and then against health
+* once health reaches 0 the robot is dead
+* each time you attack your attack point are reduced by 1
+
+***Initiative*** Do we want this rule?
+* robots assigned initiative order by player
+* robots move in initiative order
+* players can block themselves if they are not careful
+
+***Resolving Movement - two robots move into same hex on same move***
+* robot with higher initiative moves in
+* second robot attacks from the hex where it is
+* robots battle
+* if defending robot is killed, attacking robot moves into hex
+* if defending robot kills attacking robot, the hex the attacking robot was entering from is free
+* if neither robot wins and it was the first move:
+  * defending robot will execute next move
+  * attacking robot will attempt the same move (i.e., try to move into the hex again)
+* if neither robot wins and it was the second move:
+  * both robots stay where they are
+
+***Resolving Movement - chasing robot has higher initiative, catches other***
+* even if a robot is leaving a square, it can be attacked before leaving
+* the robot moving in must have higher Initiative
+* battle occurs and points are resolved
+* robot with higher initiative has move "pend"
+* if leaving robot able to leaves hex on it's initiative order
+  * leaving robot leaves
+  * hex is now free for next highest initiative robot attempting to move in
+  * may not be the robot that attacked
+* if leaving robot NOT able to leaves hex on it's initiative order
+  * attacking robot's move is marked fail
+  * if move 1, attacking robot will attempt the same move on a second move
+
+
+***Resolving Movement - more than 2 robots move into same hex on same move***
+
+
+***Resolving Movement - enemy robots exchange hexes***
+Example: robot 1 goes from A to B, while simultaneously robot 2 moves from B to A
+
+
+***Resolving Movement - robot blocked, cannot advance***
+Example: target hex becomes occupied by robot with higher Initiative
+Example: following another robot that itself becomes blocked
