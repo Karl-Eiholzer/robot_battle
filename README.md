@@ -96,3 +96,62 @@ Example: robot 1 goes from A to B, while simultaneously robot 2 moves from B to 
 ***Resolving Movement - robot blocked, cannot advance***
 Example: target hex becomes occupied by robot with higher Initiative
 Example: following another robot that itself becomes blocked
+
+***Pseudo-code for back end turn resolution***
+* initiate: robots all placed to MoveStatus = PENDING and Initiative values updated, Buffs to stats are applied
+* put starting positions and metrics in the MoveLog
+  * Nested Dictionary: MoveLog:
+    MoveNum - [Robot -
+      [Id - n, Status - n, Health - n, Armor - n, Attack - n],
+               Moves -
+      [ Start - , End - ]
+              ]
+* CurrentPositions dictionary (initiate if start of game, otherwise same from prior end-of-turn)
+    * CurrentPositions dictionary: HexPosition - RobotId
+* CurrentRobotStatus nested dictionary (initiate if start of game, otherwise same from prior end-of-turn)
+    * RobotId - [RobotStatus - n, MoveStatus - CHAR, Initiative - n, Team - n, Health - n, Armor - n, Attack - n]
+
+* while RUN flag 0 select robot to attempt move
+  * Construct list from CurrentRobotStatus with RobotID, RobotStatus - n, MoveStatus - CHAR, Initiative - n
+  * if all RobotStatus in DEAD or COMPLETE status
+    * update RUN flag to 1
+    * pass
+  * else
+    * if LastMoveStatus returns DEFER
+      * select robot with highest initiate in PENDING status
+      * call MoveResolution function for selected robot
+    * else LastMoveStatus status != DEFER
+      * select robot with highest initiate in DEFER status
+      * call MoveResolution function for selected robot
+* while run flag != 0
+  * call return gamestate function
+
+* MoveResolution function(RobotId, )
+  * inputs: robot ID
+  * output: move status, robot position, updated robot statistics
+  * move status return is DEFER, COMPLETE, or DEAD
+* call IsHexOccupied function
+* if square is free
+  * update location
+  * set move status = COMPLETE
+  * return
+* else square is not free
+  * if occupied by friendly
+    * no location update
+    * set move status = DEFER
+    * return
+  * else occupied by enemy
+        * call BATTLE function
+        * if robot status returns DEAD
+          * update location (not on board)
+          * return
+        * else robot status returns ALIVE
+          * no location update
+          * set move status = DEFER (because other robot may yet move out)
+
+* IsHexOccupied function (HexPosition)
+  * Check if HexPosition in CurrentPositionStatus
+  * If yes, retrieve
+
+* get RobotCurrentStateFunction
+  * TBD
