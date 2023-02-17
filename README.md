@@ -8,6 +8,7 @@ multi-player with web server resolving turn actions between clients
 
 ***Web site has django REST API fron end***
 * starting code copied from this tutorial: https://www.youtube.com/watch?v=c708Nf0cHrs
+* github here: https://github.com/codingforentrepreneurs/Django-Rest-Framework-Tutorial
 
 ***Client is pygame***
 * but it posts actions to the REST API (POST)
