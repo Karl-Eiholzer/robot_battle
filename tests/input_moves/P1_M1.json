@@ -1,0 +1,65 @@
+{
+    "robot1": {
+        "start": [
+            -2,
+            3,
+            1
+        ],
+        "move1": [
+            -2,
+            3,
+            1
+        ],
+        "move2": [
+            -2,
+            3,
+            1
+        ],
+        "health": 6,
+        "armor": 3,
+        "attack": 3
+    },
+    "robot2": {
+        "start": [
+            -2,
+            3,
+            1
+        ],
+        "move1": [
+            -2,
+            3,
+            1
+        ],
+        "move2": [
+            -2,
+            3,
+            1
+        ],
+        "health": 6,
+        "armor": 3,
+        "attack": 3
+    },
+    "robot3": {
+        "start": [
+            -2,
+            3,
+            1
+        ],
+        "move1": [
+            -2,
+            3,
+            1
+        ],
+        "move2": [
+            -2,
+            3,
+            1
+        ],
+        "health": 6,
+        "armor": 3,
+        "attack": 3
+    },
+    "player": {
+        "player": 1
+    }
+}
