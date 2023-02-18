@@ -13,6 +13,15 @@ def nameYourself(n=0):
     outName = str( random.choice(fName) + ' ' + random.choice(mName) + '. ' + random.choice(lName))
     return(outName)
 
+# generate a random funny name
+def nameTheGame(n=0):
+    import random
+    fName = ['angry', 'bold', 'brutal', 'cutthroat', 'dangerous', 'ferocious', 'fiery', 'furious', 'intense', 'murderous', 'passionate', 'powerful', 'raging', 'relentless', 'savage', 'stormy', 'strong', 'terrible', 'vehement', 'vicious', 'animal']
+    mName = ['delicate', 'devilish', 'disobedient', 'elfish', 'frolicsome', 'impish', 'little', 'minute', 'misbehaving', 'naughty', 'petite', 'playful', 'prankish', 'puckish', 'puny', 'slight']
+    lName = ['action', 'assault', 'attack', 'bloodshed', 'bombing', 'campaign', 'clash', 'combat', 'conflict', 'crusade', 'encounter', 'fighting', 'hostility', 'skirmish', 'strife', 'struggle', 'war', 'warfare', 'barrage', 'brush', 'carnage', 'contention', 'engagement', 'fray', 'havoc', 'onset', 'onslaught', 'press', 'ravage', 'scrimmage', 'sortie']
+    outName = str( random.choice(fName) + ' and ' + random.choice(mName) + ' ' + random.choice(lName) + ' ' + str(random.randint(1, 100)) )
+    return(outName)
+
 
 # put the json file where you need it
 def createJSON( inputDict, FilePath):
@@ -39,7 +48,7 @@ def FileAck(inputFileName, inputControllerName, outPath, errStatus='good'):
     return(outputFileName, returnStatus)
 
 # game controller error function
-def gameControlError(errStatus='good'):
+def gameControlError(errMessage):
     outDict = {'ControllerId': inputFileName, 'status': errStatus}
     if errStatus == 'good':
         outputFileName = str('ack_' + inputFileName)
@@ -53,4 +62,11 @@ def gameControlError(errStatus='good'):
         returnStatus = 1
     return(outputFileName, returnStatus)
 
-
+def moveToArchive(fileName, currPath, archPath):
+    import shutil
+    import os
+    fileToArch = currPath / fileName
+    fileArchive = archPath / fileName
+    #  print('Processing ' + fileName)
+    shutil.copy2(fileToArch, fileArchive)
+    os.remove(fileToArch)
