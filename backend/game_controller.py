@@ -19,6 +19,9 @@
 # Import Libraries
 import json
 import os 
+import shutil
+import sys
+
 
 # working directory management
 from pathlib import Path
@@ -28,17 +31,19 @@ cwd = Path()
 cwd = cwd.absolute()
 ProjDirectory = cwd
 # only change these parameters if the structure of the project folders changes
-locationName = 'backend'
 InputsDirectoryName = 'controller_inputs'
-InputsDirectoryPath = cwd / locationName / InputsDirectoryName
+InputsDirectoryPath = cwd / InputsDirectoryName
 OutputsDirectoryName = 'controller_outputs'
-OutputsDirectoryPath = cwd / locationName / OutputsDirectoryName
+OutputsDirectoryPath = cwd / OutputsDirectoryName
+ArchiveDirectoryName = 'archive'
+ArchiveDirectoryPath = cwd / ArchiveDirectoryName
 
 # get local functions
 FunctionsDirectoryName = 'controllerLib'
-FunctionsDirectoryPath = cwd / locationName / FunctionsDirectoryName
+FunctionsDirectoryPath = cwd / FunctionsDirectoryName
+sys.path.append(FunctionsDirectoryPath)
 os.chdir(FunctionsDirectoryPath)
-from InOutFunctions import nameYourself, createJSON, FileAck, gameControlError
+from InOutFunctions import nameYourself, nameTheGame, createJSON, FileAck, gameControlError, moveToArchive
 # from gameFunctions  import 
 os.chdir(ProjDirectory)
 
@@ -47,9 +52,14 @@ os.chdir(ProjDirectory)
 
 # set a random name for this contoller
 controllerName = nameYourself()
+# for stray files that come in a gunk up the works
 validProcessingStates = ['No','Restart','Shut Down','Ready','Timeout']
 startFileName = 'startGame.json'
 endFileName   = 'endGame.json'
+# name the game for this run
+gameName = nameTheGame()
+gameArchiveDirectoryPath = ArchiveDirectoryPath / gameName.replace(' ','_') # for saving old files from each game
+os.mkdir(gameArchiveDirectoryPath)
 
 #############################
 # main function
@@ -71,38 +81,55 @@ while run == 0:
     while ProcessingInputs == 'No':        
         # check input directory for new files
         inputFileList = os.listdir(InputsDirectoryPath)
-        currCount = len(inputFileList)
+        currCount = 0
+        for f in inputFileList:
+            if f[-5:] == '.json':
+                currCount += 1
+            else:
+                pass
         p1Expected = str('P1_M' + str(moveNum) + '.json')
         p2Expected = str('P2_M' + str(moveNum) + '.json')
         if currCount > 0:
             for i in range(0,currCount):
                 if startFileName in inputFileList:
                     ProcessingInputs = 'Restart'
-                    allFilesProcessed = []
-                    fileToRemove = InputsDirectoryPath / startFileName
-                    os.remove(fileToRemove)
+                    # allFilesProcessed = []
+                    filesToProcess = []
                     # remove files from directory
+                    x, y = FileAck(inputFileName=startFileName, inputControllerName=controllerName, outPath=OutputsDirectoryPath, errStatus='good')
+                    moveToArchive(startFileName, InputsDirectoryPath, gameArchiveDirectoryPath)
+                    #exit
+                    run = 1
                 elif endFileName in inputFileList:
                     ProcessingInputs = 'Shut Down'
-                    allFilesProcessed = []
-                    fileToRemove = InputsDirectoryPath / endFileName  # replace with something that removes all files
-                    os.remove(fileToRemove)
+                    # allFilesProcessed = []
+                    filesToProcess = []
                     # remove files from directory
+                    x, y = FileAck(inputFileName=endFileName, inputControllerName=controllerName, outPath=OutputsDirectoryPath, errStatus='good')
+                    moveToArchive(endFileName, InputsDirectoryPath, gameArchiveDirectoryPath)
+                    #exit
+                    run = 1
                 elif p1Expected in inputFileList and p2Expected in inputFileList:
-                    filesToProcess.append(p1Expected)
-                    allFilesProcessed.append(p1Expected)
-                    filesToProcess.append(p2Expected)
-                    allFilesProcessed.append(p2Expected)
+                    if p1Expected in filesToProcess:
+                        pass
+                    else:
+                        filesToProcess.append(p1Expected)
+                        allFilesProcessed.append(p1Expected)
+                    if p2Expected in filesToProcess:
+                        pass
+                    else:
+                        filesToProcess.append(p2Expected)
+                        allFilesProcessed.append(p2Expected)
                     ProcessingInputs = 'Ready'
                 else:
                     WaitForFileCount += 1
-                    time.sleep(3)
+                    time.sleep(10)
         else:
             WaitForFileCount += 1
-            if WaitForFileCount > 10:
+            if WaitForFileCount > 30:
                 ProcessingInputs = 'Timeout'
             else:
-                time.sleep(3)
+                time.sleep(2)
 
     
     if ProcessingInputs in validProcessingStates:
@@ -111,6 +138,7 @@ while run == 0:
         # do things to clear up the game space
         print('Value for ProcessingInputs is incorrect:')
         print(ProcessingInputs)
+        print('Exiting application')
         run = 1
 
     if ProcessingInputs == 'Restart':
@@ -134,16 +162,33 @@ while run == 0:
     else:
         pass
 
+    # code for scenario where both players files have been recieved and need to be processed 
     if ProcessingInputs == 'Ready':
         # do things to clear up the game space
         print('Play the turn!!!')
         print('Generate results!!')
-        run = 1
+        errStatus = 0
+        for i in range(0,2):
+            fileName = filesToProcess[i]
+            try:
+                x, y = FileAck(inputFileName=fileName, inputControllerName=controllerName, outPath=OutputsDirectoryPath, errStatus='good')
+                errStatus = max(0,errStatus)
+                moveToArchive(fileName, InputsDirectoryPath, gameArchiveDirectoryPath)
+            except:
+                # do things to clear up the game space
+                print('Either the FileAck function or the moveToArchive function failed. Exiting.')
+                run = 1
+        if errStatus > 0:
+            print('Error status returned from FileAck')
+            print('Check output folder to see if file was acknowledged')
+            run = 1
+        else:
+            ProcessingInputs = 'No'
     else:
         pass
         
-
-    x, y = FileAck(inputFileName='p1_m1.json', inputControllerName=controllerName, outPath=OutputsDirectoryPath, errStatus='good')
+    print(filesToProcess)
+    
 
 
 
