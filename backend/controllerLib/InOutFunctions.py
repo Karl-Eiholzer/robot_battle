@@ -62,11 +62,23 @@ def gameControlError(errMessage):
         returnStatus = 1
     return(outputFileName, returnStatus)
 
-def moveToArchive(fileName, currPath, archPath):
+def moveToArchive(fileName, currPath, archPath, gameName):
     import shutil
     import os
+    uniqueName = gameName.replace(' ','_')
+    gameArchiveDirectoryPath = archPath / uniqueName
     fileToArch = currPath / fileName
-    fileArchive = archPath / fileName
+    fileArchive = gameArchiveDirectoryPath / fileName
+    # create archive folder if it does not exist
+    if os.path.exists(archPath):
+        pass 
+    else:
+        os.mkdir(archPath)
+    # create subfolder specific to game if it does not exist
+    if os.path.exists(gameArchiveDirectoryPath):
+        pass 
+    else:
+        os.mkdir(gameArchiveDirectoryPath)
     #  print('Processing ' + fileName)
     shutil.copy2(fileToArch, fileArchive)
     os.remove(fileToArch)
