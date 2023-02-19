@@ -58,8 +58,6 @@ startFileName = 'startGame.json'
 endFileName   = 'endGame.json'
 # name the game for this run
 gameName = nameTheGame()
-gameArchiveDirectoryPath = ArchiveDirectoryPath / gameName.replace(' ','_') # for saving old files from each game
-os.mkdir(gameArchiveDirectoryPath)
 
 #############################
 # main function
@@ -96,8 +94,8 @@ while run == 0:
                     # allFilesProcessed = []
                     filesToProcess = []
                     # remove files from directory
-                    x, y = FileAck(inputFileName=startFileName, inputControllerName=controllerName, outPath=OutputsDirectoryPath, errStatus='good')
-                    moveToArchive(startFileName, InputsDirectoryPath, gameArchiveDirectoryPath)
+                    x, y = FileAck(inputFileName=startFileName, inputControllerName=controllerName, outPath=OutputsDirectoryPath, gameName=gameName, errStatus='good')
+                    moveToArchive(startFileName, InputsDirectoryPath, ArchiveDirectoryPath, gameName)
                     #exit
                     run = 1
                 elif endFileName in inputFileList:
@@ -105,8 +103,8 @@ while run == 0:
                     # allFilesProcessed = []
                     filesToProcess = []
                     # remove files from directory
-                    x, y = FileAck(inputFileName=endFileName, inputControllerName=controllerName, outPath=OutputsDirectoryPath, errStatus='good')
-                    moveToArchive(endFileName, InputsDirectoryPath, gameArchiveDirectoryPath)
+                    x, y = FileAck(inputFileName=endFileName, inputControllerName=controllerName, outPath=OutputsDirectoryPath, gameName=gameName, errStatus='good')
+                    moveToArchive(endFileName, InputsDirectoryPath, ArchiveDirectoryPath, gameName)
                     #exit
                     run = 1
                 elif p1Expected in inputFileList and p2Expected in inputFileList:
@@ -171,9 +169,9 @@ while run == 0:
         for i in range(0,2):
             fileName = filesToProcess[i]
             try:
-                x, y = FileAck(inputFileName=fileName, inputControllerName=controllerName, outPath=OutputsDirectoryPath, errStatus='good')
+                x, y = FileAck(inputFileName=fileName, inputControllerName=controllerName, outPath=OutputsDirectoryPath, gameName=gameName, errStatus='good')
                 errStatus = max(0,errStatus)
-                moveToArchive(fileName, InputsDirectoryPath, gameArchiveDirectoryPath)
+                moveToArchive(fileName, InputsDirectoryPath, ArchiveDirectoryPath, gameName)
             except:
                 # do things to clear up the game space
                 print('Either the FileAck function or the moveToArchive function failed. Exiting.')

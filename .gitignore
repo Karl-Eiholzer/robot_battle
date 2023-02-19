@@ -3,3 +3,5 @@ backend/archive/
 backend/venv/
 client/venv/
 *.log
+controller_inputs/
+controller_outputs/
