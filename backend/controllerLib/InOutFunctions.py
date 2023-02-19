@@ -32,9 +32,9 @@ def createJSON( inputDict, FilePath):
             json.dump(inputDict, f, indent = 4)
 
 # file ACK function
-def FileAck(inputFileName, inputControllerName, outPath, errStatus='good'):
+def FileAck(inputFileName, inputControllerName, outPath, gameName, errStatus='good'):
     returnStatus = 0
-    outDict = {'FileName': inputFileName, 'GameController': inputControllerName, 'status': errStatus}
+    outDict = {'FileName': inputFileName, 'GameController': inputControllerName, 'NameOfGame':gameName, 'status': errStatus}
     if errStatus == 'good':
         outputFileName = str('ack_' + inputFileName)
     else:
