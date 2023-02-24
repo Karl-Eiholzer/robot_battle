@@ -39,13 +39,10 @@ ArchiveDirectoryName = 'archive'
 ArchiveDirectoryPath = cwd / ArchiveDirectoryName
 
 # get local functions
-FunctionsDirectoryName = 'controllerLib'
-FunctionsDirectoryPath = cwd / FunctionsDirectoryName
-sys.path.append(FunctionsDirectoryPath)
-os.chdir(FunctionsDirectoryPath)
-from InOutFunctions import nameYourself, nameTheGame, createJSON, FileAck, gameControlError, moveToArchive
-# from gameFunctions  import 
-os.chdir(ProjDirectory)
+# FunctionsDirectoryName = 'controllerLib'
+# FunctionsDirectoryPath = cwd / FunctionsDirectoryName 
+# sys.path.append(FunctionsDirectoryPath)
+from controllerLib.InOutFunctions import nameYourself, nameTheGame, createJSON, FileAck, gameControlError, moveToArchive
 
 #############################
 # set key parameters

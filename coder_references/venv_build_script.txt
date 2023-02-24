@@ -1,0 +1,6 @@
+cd /Users/family/Projects/Git/robot_battle/backend   # move to correct directory
+source venv/bin/activate    # start up the virtual environment
+export PYTHONPATH="${PYTHONPATH}:/Users/family/Projects/Git/robot_battle/backend/controllerLib"  # tell it to look here for my home-made functions
+python game_controller.py   # fire up the application!!
+
+deactivate   # after application exits, kill the virtual environment
