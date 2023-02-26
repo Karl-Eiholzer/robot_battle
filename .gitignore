@@ -1,7 +1,6 @@
 .DS_Store
-backend/archive/
-backend/venv/
-client/venv/
+archive/
+venv/
 *.log
 controller_inputs/
 controller_outputs/
