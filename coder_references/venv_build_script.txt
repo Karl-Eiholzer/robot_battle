@@ -1,6 +1,66 @@
-cd /Users/family/Projects/Git/robot_battle/backend   # move to correct directory
+==============================================================
+==> during development - to add modules to the environment <==
+     ===> macOS
+cd /Users/family/Projects/Git/robot_battle   # move to correct directory
+source venv/bin/activate    # start up the virtual environment - macOS
+python3 -m pip install requests  # this adds the module requests to the virtual environment
+
+deactivate   # after application exits, kill the virtual environment
+
+
+     ===> windows
+cd /Users/family/Projects/Git/robot_battle   # ????
+.\env\Scripts\activate    # start up the virtual environment - macOS
+py -m pip install requests  # this adds the module requests to the virtual environment
+
+deactivate   # after application exits, kill the virtual environment
+
+
+
+
+
+=========================================================================
+==> run the application on the SAME machine with existing venv folder <==
+     ===> macOS
+cd /Users/family/Projects/Git/robot_battle   # move to correct directory
 source venv/bin/activate    # start up the virtual environment
 export PYTHONPATH="${PYTHONPATH}:/Users/family/Projects/Git/robot_battle/controllerLib"  # tell it to look here for my home-made functions
-python game_controller.py   # fire up the application!!
+export PYTHONPATH="${PYTHONPATH}:/Users/family/Projects/Git/robot_battle/apiLib"  # tell it to look here for my home-made functions
+python robot_rest_api.py   # fire up the application!!
+
+deactivate   # after application exits, kill the virtual environment
+
+
+     ===> windows
+cd /Users/family/Projects/Git/robot_battle   # ??? slashes backwards???
+.\env\Scripts\activate    # start up the virtual environment
+export PYTHONPATH="${PYTHONPATH}:/Users/family/Projects/Git/robot_battle/controllerLib"  # tell it to look here for my home-made functions
+export PYTHONPATH="${PYTHONPATH}:/Users/family/Projects/Git/robot_battle/apiLib"  # tell it to look here for my home-made functions
+python robot_rest_api.py   # fire up the application!!
+
+deactivate   # after application exits, kill the virtual environment
+
+
+
+====================================================================
+==> run the application on DIFFERENT machine without venv folder <==
+     ===> macOS
+cd /Users/family/Projects/Git/robot_battle   # move to correct directory
+source venv/bin/activate    # start up the virtual environment
+python3 -m pip install -r requirements.txt   # from requirements.txt load the correct environment modules to be able to run
+export PYTHONPATH="${PYTHONPATH}:/Users/family/Projects/Git/robot_battle/controllerLib"  # tell it to look here for my home-made functions
+export PYTHONPATH="${PYTHONPATH}:/Users/family/Projects/Git/robot_battle/apiLib"  # tell it to look here for my home-made functions
+python robot_rest_api.py   # fire up the application!!
+
+deactivate   # after application exits, kill the virtual environment
+
+
+     ===> windows
+cd /Users/family/Projects/Git/robot_battle   # ??? slashes backwards???
+.\env\Scripts\activate    # start up the virtual environment
+py -m pip install -r requirements.txt    # from requirements.txt load the correct environment modules to be able to run
+export PYTHONPATH="${PYTHONPATH}:/Users/family/Projects/Git/robot_battle/controllerLib"  # tell it to look here for my home-made functions
+export PYTHONPATH="${PYTHONPATH}:/Users/family/Projects/Git/robot_battle/apiLib"  # tell it to look here for my home-made functions
+python robot_rest_api.py   # fire up the application!!
 
 deactivate   # after application exits, kill the virtual environment
