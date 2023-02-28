@@ -73,13 +73,23 @@ def submit():
     # try to get data from put request
     try:
         instantRecord = json.loads(request.data)
+        print('Object instantRecord is of type: ' + str(type(instantRecord)))
+        print(instantRecord)
         instantOut = 'Success'
     except Exception as e:
+        print('Fail at Step 1')
         instantOut=str(e)
     # append results of getting data to output package
     finalOut["DataCapture"] = instantOut
     # create filename for output file - depending on which play input the json
-    fileName= cwd / InputsDirectoryName / 'P1_M1.json'
+    #    -  start by trying to extract name from file
+    try:
+        extractedName = str(instantRecord['playerName'] + '.json')
+    except Exception as e:
+        print('Fail at Step 2')
+        print("Failed to extract name from file. Error:" + str(e))
+        extractedName = "extractFail.json"
+    fileName= cwd / InputsDirectoryName / extractedName
     # export dictionary to filepath as json
     try:
         writeResult = sendSubmissionToInputs(InPath=fileName, jsonIn=instantRecord)
@@ -88,6 +98,7 @@ def submit():
         else: 
             writeOut = writeResult
     except Exception as e:
+        print('Fail at Step 3')
         writeOut = str(e)
     # append results of write action to the output package
     finalOut["DataWrite"] = writeOut
