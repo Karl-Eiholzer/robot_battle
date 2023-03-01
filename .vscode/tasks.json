@@ -1,0 +1,30 @@
+{
+    "tasks": [
+        {
+            "label": "Install Requirements",
+            "type": "shell",
+            "command": "cd venv/robot_battle && python3 -m pip install --upgrade pip && python3 -m pip install -r requirements_simon.txt",
+            "dependsOn": "Create Virtual Env",
+            "dependsOrder": "sequence"
+        },
+        {
+            "label": "Create Virtual Env",
+            "type": "shell",
+            "command": "cd venv/robot_battle && python3 -m venv ./ && source bin/activate",
+            "dependsOn": "Clone Repo",
+            "dependsOrder": "sequence"
+        },
+        {
+            "label": "Clone Repo",
+            "type": "shell",
+            "command": "cd venv && git clone https://github.com/Karl-Eiholzer/robot_battle.git && cd robot_battle",
+            "dependsOn": "Cleanup",
+            "dependsOrder": "sequence"
+        },
+        {
+            "label": "Cleanup",
+            "type": "shell",
+            "command": "rm -rf venv/robot_battle"
+        }
+    ]
+}
