@@ -7,12 +7,12 @@
         {
             "name": "Python: Create Vitrual Environment and Run Server",
             "type": "python",
+            "sudo": true,
             "request": "launch",
             "program": "venv/robot_battle/robot_rest_api.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "preLaunchTask": "Install Requirements",
-            "cwd": "${rootDirectory}"
         }
     ]
 }

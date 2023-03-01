@@ -10,21 +10,21 @@
         {
             "label": "Create Virtual Env",
             "type": "shell",
-            "command": "cd venv/robot_battle && python3 -m venv ./ && source bin/activate",
+            "command": "cd venv/robot_battle && sudo python3 -m venv ./ && source bin/activate",
             "dependsOn": "Clone Repo",
             "dependsOrder": "sequence"
         },
         {
             "label": "Clone Repo",
             "type": "shell",
-            "command": "cd venv && git clone https://github.com/Karl-Eiholzer/robot_battle.git && cd robot_battle",
+            "command": "cd venv && git clone -b Linux-Venv https://github.com/Karl-Eiholzer/robot_battle.git && cd robot_battle",
             "dependsOn": "Cleanup",
             "dependsOrder": "sequence"
         },
         {
             "label": "Cleanup",
             "type": "shell",
-            "command": "rm -rf venv/robot_battle"
+            "command": "sudo rm -rf venv/robot_battle"
         }
     ]
 }
