@@ -4,3 +4,4 @@ venv/
 *.log
 controller_inputs/
 controller_outputs/
+__pycache__/
