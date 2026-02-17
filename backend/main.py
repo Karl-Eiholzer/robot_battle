@@ -78,7 +78,7 @@ async def create_game(request: CreateGameRequest):
     game_meta = {
         "state": "waiting_for_players",
         "current_turn": 0,
-        "player_count": 1,
+        "player_count": 0,
         "max_players": request.max_players,
         "created_at": datetime.utcnow().isoformat()
     }
