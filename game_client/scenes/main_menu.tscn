@@ -1,0 +1,119 @@
+[gd_scene load_steps=2 format=3 uid="uid://main_menu"]
+
+[ext_resource type="Script" path="res://scenes/main_menu.gd" id="1"]
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.08, 0.08, 0.12, 1)
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="VBox" type="VBoxContainer" parent="CenterContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(400, 0)
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="CenterContainer/VBox"]
+layout_mode = 2
+text = "ROBOT BATTLE"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 36
+theme_override_colors/font_color = Color(0.9, 0.7, 0.1, 1)
+
+[node name="Subtitle" type="Label" parent="CenterContainer/VBox"]
+layout_mode = 2
+text = "Turn-based Hex Strategy"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+
+[node name="Spacer1" type="Control" parent="CenterContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 16)
+
+[node name="PlayerNameLabel" type="Label" parent="CenterContainer/VBox"]
+layout_mode = 2
+text = "Your Name:"
+
+[node name="PlayerNameInput" type="LineEdit" parent="CenterContainer/VBox"]
+layout_mode = 2
+placeholder_text = "Enter your name..."
+custom_minimum_size = Vector2(0, 40)
+
+[node name="TeamSizeLabel" type="Label" parent="CenterContainer/VBox"]
+layout_mode = 2
+text = "Team Size (players per team):"
+
+[node name="TeamSizeOption" type="OptionButton" parent="CenterContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 40)
+item_count = 2
+selected = 0
+
+[node name="Spacer2" type="Control" parent="CenterContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 8)
+
+[node name="CreateGameBtn" type="Button" parent="CenterContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+text = "Create New Game"
+
+[node name="Separator" type="HSeparator" parent="CenterContainer/VBox"]
+layout_mode = 2
+
+[node name="GameIDLabel" type="Label" parent="CenterContainer/VBox"]
+layout_mode = 2
+text = "Game ID (to join existing):"
+
+[node name="GameIDInput" type="LineEdit" parent="CenterContainer/VBox"]
+layout_mode = 2
+placeholder_text = "Paste game ID here..."
+custom_minimum_size = Vector2(0, 40)
+
+[node name="JoinGameBtn" type="Button" parent="CenterContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+text = "Join Game"
+
+[node name="Spacer3" type="Control" parent="CenterContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 8)
+
+[node name="StatusLabel" type="Label" parent="CenterContainer/VBox"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+autowrap_mode = 3
+theme_override_colors/font_color = Color(0.4, 0.9, 0.4, 1)
+
+[node name="ErrorLabel" type="Label" parent="CenterContainer/VBox"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+autowrap_mode = 3
+theme_override_colors/font_color = Color(0.9, 0.3, 0.3, 1)
+
+[node name="GameIDDisplay" type="Label" parent="CenterContainer/VBox"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.7, 0.7, 1.0, 1)
+
+[node name="PollTimer" type="Timer" parent="."]
+wait_time = 5.0

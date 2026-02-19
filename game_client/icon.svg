@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect width="128" height="128" fill="#0d1117"/>
+  <polygon points="64,20 90,35 90,65 64,80 38,65 38,35" fill="#1a3a6b" stroke="#4a90e2" stroke-width="3"/>
+  <circle cx="64" cy="50" r="18" fill="#4a90e2"/>
+  <text x="64" y="57" text-anchor="middle" font-family="monospace" font-size="18" fill="white" font-weight="bold">R</text>
+</svg>
