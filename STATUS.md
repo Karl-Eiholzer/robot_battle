@@ -1,353 +1,255 @@
-# Project Status - Robot Battle Backend
+# Project Status - Robot Battle
 
-**Last Updated:** 2026-02-08
-**Current Phase:** Railway Deployment in Progress
-
----
-
-## ✅ Completed Tasks
-
-### 1. Backend Code Implementation (100% Complete)
-
-All backend files have been created, tested, and committed to GitHub:
-
-**Files Created:**
-- `backend/requirements.txt` - Python dependencies (FastAPI, Redis, etc.)
-- `backend/Procfile` - Railway deployment config
-- `backend/runtime.txt` - Python 3.11.7 specification (fixes pydantic build)
-- `backend/.env.example` - Environment variable template
-- `backend/config.py` - Configuration management
-- `backend/redis_client.py` - Redis data access layer (450+ lines)
-- `backend/models.py` - Pydantic request/response models
-- `backend/auth.py` - API key authentication
-- `backend/game_logic.py` - Turn processing stub (MVP)
-- `backend/main.py` - FastAPI application with 6 endpoints (350+ lines)
-- `backend/.gitignore` - Git ignore patterns
-- `backend/README.md` - Complete backend documentation
-- `test_api.py` - Integration test script (360+ lines)
-
-**Git Status:**
-- Branch: `test1` (up to date with origin)
-- Latest commit: `682b9c0` - "Add runtime.txt for Railway Python version"
-- Merged to `main`: ✅ PR #27 and PR #28 merged successfully
-- Main branch merge commit: `12f8f95ad3be7165be40740e3c4d837c72f6e150`
-
-### 2. API Endpoints Implemented
-
-- `GET /health` - Health check (no auth)
-- `GET /` - Root endpoint with API info
-- `POST /game/create` - Create new game instance
-- `POST /game/{game_id}/join` - Join existing game
-- `GET /game/{game_id}/status` - Get game status (auth required)
-- `POST /game/{game_id}/submit` - Submit turn moves (auth required)
-- `GET /game/{game_id}/results` - Poll for turn results (auth required)
-
-### 3. Documentation
-
-- `README.md` - Project overview
-- `backend/README.md` - Complete backend documentation
-- `api_architecture.md` - Backend architecture details
-- `godot_architecture.md` - Game client architecture
-- `claude.md` - Project overview and development guide
+**Last Updated:** 2026-02-17
+**Current Phase:** Phase 2 - Real Game Mechanics (Implementation Complete, Needs Deployment)
 
 ---
 
-## 🚧 In Progress
+## Completed Phases
 
-### Railway Deployment
+### Phase 1: Backend Deployment ✅
 
-**Current Status:** Backend service deployment failing on pip install
+**All tasks complete:**
 
-**Issue Encountered:**
-- Error: "Failed building wheel for pydantic-core"
-- **Solution Applied:** Added `backend/runtime.txt` with Python 3.11.7
-- **Status:** Fix merged to main branch (PR #28)
-- **Next Action:** Railway needs to redeploy with the new runtime.txt
+- Backend fully implemented (FastAPI + Redis, 6 endpoints)
+- Deployed to Railway: https://robotbattle-production.up.railway.app
+- Redis connected and healthy (`"redis": true`)
+- Player counting bug fixed (creator was counted twice)
+- All 14 integration tests passing (`python test_api.py`)
+- Two game mechanics documents committed to git
 
----
+**Railway Project:**
+- Project: `marvelous-wholeness`
+- Project ID: `773c40ec-eaec-4331-873b-4972b42dbe9d`
+- Backend URL: https://robotbattle-production.up.railway.app
+- Redis: `redis.railway.internal:6379` (internal)
+- Environment variables: `REDIS_URL`, `API_SECRET` set (ENVIRONMENT still shows "development" - harmless typo in Railway dashboard)
 
-## 🔑 Important Information
-
-### Railway Project Details
-
-**Project Name:** marvelous-wholeness
-**Project ID:** `773c40ec-eaec-4331-873b-4972b42dbe9d`
-**Project URL:** https://railway.com/project/773c40ec-eaec-4331-873b-4972b42dbe9d
-
-**Services:**
-1. **Redis Service** (Running ✅)
-   - Service ID: `0070d93d-fe56-4e2d-b420-13c994a269cf`
-   - Internal URL: `redis.railway.internal:6379`
-   - Public URL: `redis-production-873d.up.railway.app`
-   - Status: Healthy and running
-
-2. **Backend API Service** (Deployment in progress ⏳)
-   - Root directory: `/backend`
-   - GitHub repo: `Karl-Eiholzer/robot_battle`
-   - Branch: `main`
-   - Status: Needs redeploy with runtime.txt fix
-
-### Environment Variables (Set in Railway)
-
-**Already Configured:**
-- `REDIS_URL` = `redis://default:eniBLaeQegSBnHaHrftUjPLkyzPBsAmh@redis.railway.internal:6379` (auto-generated)
-- `API_SECRET` = `KzyufIdGvzUoH-n14DfL3MYfBiYIS9fu6rS9DcRbKTI` (manually set)
-- `ENVIRONMENT` = `production` (manually set)
-- `PORT` = Auto-provided by Railway
-
-### GitHub Repository
-
-**Repo:** https://github.com/Karl-Eiholzer/robot_battle
-**Pull Requests:**
-- PR #26: Add README - Merged ✅
-- PR #27: Add FastAPI backend - Merged ✅
-- PR #28: Fix Railway deployment (runtime.txt) - Merged ✅
-
-**Branches:**
-- `main` - Production branch (Railway deploys from here)
-- `test1` - Development branch (currently in use)
+**Git:**
+- Main branch: up to date
+- Latest commit: `ed4f1e3` - Fix player counting bug
+- New docs committed: `robot_game_backend_mechanics.md`, `robot_game_client_mechanics.md`
 
 ---
 
-## 📋 Next Steps (Tomorrow)
+## Current Phase: Phase 2 - Real Game Mechanics ✅ (Locally Complete)
 
-### Step 1: Verify Railway Deployment
+### What Was Implemented
 
-```bash
-# Check if Railway CLI is logged in
-railway whoami
+All Phase 2 sub-phases are complete in local code. Needs deployment to Railway.
 
-# If not logged in:
-railway login
+**Implemented:**
+- 4 robot types with correct stats (Captain, Scout, Defender, Engineer)
+- 3 player roles for 2-player teams (Captain, Huntsman) and 3-player teams (Captain, Huntsman, Engineer)
+- 6-round turn processing engine with all 12 collision cases
+- All 4 deploy actions (EMP, Firewall, Supply Drop, Extra Moves)
+- Stun mechanics, Captain capture win condition
+- Replay generation with animation types per round
+- Sight range filtering (fog of war)
+- Realistic map generation with obstacles and spawn zones
+- New endpoints: assign_roles, spawn_robots, initial_state
+- Comprehensive integration tests in `test_full_game.py`
+- Backward compatibility with old test_api.py format
 
-# Check deployment status
-railway status
+### What Was Previously Missing
 
-# View deployment logs
-railway logs --tail 50
-```
+~~The deployed backend has **stub implementations** only:~~
+~~- No robot types — generic "soldier" units~~
+~~- No real turn processing — moves accepted but nothing actually happens~~
+~~- No win condition — games never end~~
+~~- No deploy actions — no EMP, Firewall, Supply Drop~~
+~~- No player roles — no Captain, Huntsman, or Engineer roles~~
+~~- No replay data — turn results are bare-bones~~
 
-### Step 2: Trigger Redeploy (if needed)
+### Phase 2 Implementation Plan (6 Sub-phases)
 
-**Option A: Via Railway Dashboard**
-1. Go to: https://railway.com/project/773c40ec-eaec-4331-873b-4972b42dbe9d
-2. Find the backend service (the one linked to GitHub repo)
-3. Click "Redeploy" or "Trigger Deploy"
-4. Monitor build logs to ensure `runtime.txt` is recognized
-5. Wait for deployment to complete
+#### Phase 2a: Core Data Models *(Simple, ~400-500 lines)*
+**File:** `backend/models.py`
+- Add `RobotTypeStats` model + `ROBOT_TYPE_STATS` constant for all 4 robot types:
+  - **Captain:** 3 moves, max 2 energy, EMP deploy, strength 7, team_order 1
+  - **Scout:** 4 moves, max 6 energy, Extra Moves deploy, strength 3, team_order 3
+  - **Defender:** 2 moves, max 3 energy, Firewall deploy, strength 5, team_order 3
+  - **Engineer:** 6 moves, max 3 energy, Supply Drop deploy, strength 0, team_order 0
+- Add `GameVariables` model (team_size, map_size, input_time, review_time, starting_energy)
+- Add `PlayerRole` model defining robot counts per role:
+  - 2-player teams: Captain (1 Captain + 2 Defender + 2 Engineer), Huntsman (4 Scout + 1 Engineer)
+  - 3-player teams: Captain (1 Captain + 3 Defender), Huntsman (5 Scout), Engineer (5 Engineer)
+- Add `Robot` model for runtime state (position, energy, state, spawn_position)
+- Add `RoundAction` and `DeployAction` models for turn submission
+- Add `HexObject` model (EMP/Firewall/SupplyDrop/Obstacle)
+- Add `RobotRoundReplay` and `TurnReplay` models for animation data
+- Add `AssignRolesRequest` model
+- Update `CreateGameRequest` to include `game_variables`
+- Update `SubmitMoveRequest` to accept `List[RoundAction]`
 
-**Option B: Via CLI**
-```bash
-cd /Users/family/Projects/Git/robot_battle/backend
-railway up
-```
+#### Phase 2b: Redis Extensions *(Medium, ~300-400 lines)*
+**File:** `backend/redis_client.py`
+- Add 5 new Redis key namespaces:
+  - `game:{id}:robots` — all Robot objects
+  - `game:{id}:team:{team}:roles` — player_id → role_name
+  - `game:{id}:hex_objects` — EMP/Firewall/SupplyDrop/Obstacle list
+  - `game:{id}:turn:{turn}:replay` — TurnReplay object
+  - `game:{id}:variables` — GameVariables object
+- Add 20+ new methods: store/get robots, roles, hex objects, replay, variables
 
-### Step 3: Get Backend API URL
+#### Phase 2c: Role Assignment & Robot Spawning API *(Medium, ~300-400 lines)*
+**Files:** `backend/main.py`, `backend/game_logic.py`
+- **New endpoint:** `POST /game/{game_id}/team/{team}/assign_roles`
+- **New endpoint:** `POST /game/{game_id}/spawn_robots`
+- **New endpoint:** `GET /game/{game_id}/initial_state` (customized per player)
+- Add `spawn_robots_for_game()` — creates Robot objects from role assignments
+- Add `calculate_spawn_positions()` — team 0 left/bottom, team 1 right/top
+- Add `validate_role_assignment()` — checks role combinations are legal
 
-```bash
-# Get the deployment URL
-railway domain
+#### Phase 2d: Core Turn Processing Engine *(Complex, ~800-1000 lines)*
+**File:** `backend/game_logic.py` — major rewrite of stubs
+- `establish_robot_order()` — initiative team first, then team_order, then random tiebreak
+- `process_round()` — loop all robots in order for each of 6 rounds
+- `process_robot_action()` — 12 collision cases from mechanics doc:
+  1. Robot stunned → skip (animation: "Stunned")
+  2. Wait + Firewall → destroy firewall, send to spawn, stun
+  3. Wait + EMP → stun in place
+  4. Wait (normal) → process deploy (animation: "Waiting")
+  5. Move to empty → move, process deploy (animation: "Move")
+  6. Move to enemy Captain → WIN (animation: "Bump")
+  7. Move to same-team robot → fail (animation: "Bump")
+  8. Move to weaker enemy → push, move (animation: "Power Move")
+  9. Move to stronger enemy → fail (animation: "Bump")
+  10. Move to obstacle → error (animation: "Bump")
+  11. Move to supply drop → gain energy, move (animation: "Move")
+  12. Else → error (animation: "Puzzled")
+- `process_deploy_action()` — EMP/Firewall/SupplyDrop/ExtraMoves
+- `check_win_condition()` — Captain capture detection
 
-# Or find it in Railway dashboard under the backend service
-```
+#### Phase 2e: Enhanced Submit & Results Endpoints *(Medium, ~200-300 lines)*
+**File:** `backend/main.py`
+- Update `POST /game/{game_id}/submit` — validate actions (robot ownership, move counts, energy), accept new `RoundAction` format
+- Update `GET /game/{game_id}/results` — return `TurnReplay`, filtered robot list (sight range), hex objects, winner
+- Add `validate_player_actions()` function
+- Add `filter_robots_by_sight()` function (fog of war)
 
-Expected URL format: `https://backend-production-XXXX.up.railway.app`
-
-### Step 4: Test Deployed API
-
-```bash
-# Test health endpoint
-curl https://YOUR-BACKEND-URL.up.railway.app/health
-
-# Should return:
-# {
-#   "status": "healthy",
-#   "redis": true,
-#   "environment": "production"
-# }
-```
-
-### Step 5: Run Integration Tests
-
-```bash
-cd /Users/family/Projects/Git/robot_battle
-
-# Run the test script against deployed API
-python test_api.py https://YOUR-BACKEND-URL.up.railway.app
-```
-
-The test script will:
-- Test health check
-- Create a game
-- Join with 4 players
-- Submit moves for all players
-- Wait for turn processing
-- Verify results returned
-- Check turn incremented
-
-**Expected Output:**
-```
-[TEST] Health Check
-✓ Health check passed
-✓ Redis connection is healthy
-
-[TEST] Create Game
-✓ Game created: game_abc123
-
-[TEST] Join Game as Player2
-✓ Player2 joined the game
-
-... (more tests)
-
-Test Summary
-============
-Passed: 15
-Failed: 0
-
-✓ ALL TESTS PASSED
-```
-
----
-
-## ⚠️ Issues & Solutions
-
-### Issue 1: pydantic-core Build Failure
-**Problem:** Railway couldn't build pydantic-core because Python version was not specified
-**Solution:** Added `backend/runtime.txt` with `python-3.11.7`
-**Status:** Fixed and merged to main (PR #28)
-
-### Issue 2: Backend Deployed to Redis Service
-**Problem:** Initial `railway up` command deployed backend code to Redis service
-**Solution:** Create separate backend service in Railway dashboard linked to GitHub repo with root directory `/backend`
-**Status:** User needs to complete this in Railway dashboard
-
-### Issue 3: Railway CLI Not Linked
-**Problem:** Railway CLI requires manual login (browser authentication)
-**Solution:** Run `railway login` when resuming work
-**Status:** Will need to redo tomorrow
+#### Phase 2f: Map Generation & Comprehensive Tests *(Medium, ~300-400 lines)*
+**Files:** `backend/game_logic.py`, `test_api.py`
+- Replace stub `generate_default_map()` with realistic generator:
+  - Use GameVariables.map_size (small 30x20, medium 40x40, large 60x40)
+  - Place obstacles avoiding spawn zones
+  - Strategic terrain layout
+- Add comprehensive integration tests:
+  - Full 2v2 game flow (create → roles → spawn → turns → Captain capture)
+  - Full 3v3 game flow
+  - Deploy action tests (EMP, Firewall, Supply Drop, Extra Moves)
+  - Collision/stun tests
+  - Fog of war test
 
 ---
 
-## 🔧 Railway Setup Checklist
+## Files to Modify in Phase 2
 
-When resuming tomorrow, verify these items in Railway dashboard:
-
-- [ ] Redis service is running
-- [ ] Backend service exists (separate from Redis)
-- [ ] Backend service is linked to GitHub repo `robot_battle`
-- [ ] Backend service root directory is set to `/backend`
-- [ ] Backend service has environment variables (REDIS_URL, API_SECRET, ENVIRONMENT)
-- [ ] Backend service deployment succeeded (check build logs)
-- [ ] Backend service has a public URL assigned
-- [ ] Health endpoint responds at `https://YOUR-URL/health`
+| File | Phases | Changes |
+|------|--------|---------|
+| `backend/models.py` | 2a | Add 15+ new Pydantic models |
+| `backend/redis_client.py` | 2b | Add 20+ new Redis methods |
+| `backend/game_logic.py` | 2c, 2d, 2f | Replace stubs with real game logic |
+| `backend/main.py` | 2c, 2e | Add 3 new endpoints, enhance existing |
+| `test_api.py` | 2f | Add comprehensive integration tests |
 
 ---
 
-## 📁 Project Structure
+## Success Criteria for Phase 2
+
+- [x] All 4 robot types with correct stats
+- [x] Role assignment for 2-player and 3-player teams
+- [x] 6-round turn processing with all 12 collision cases
+- [x] All 4 deploy actions functional
+- [x] Stun mechanics (Firewall + EMP)
+- [x] Replay data with animation types per round
+- [x] Captain capture win condition
+- [x] Sight range filtering (fog of war)
+- [x] Realistic map generation with obstacles
+- [x] Full 2v2 and 3v3 integration tests in `test_full_game.py`
+- [x] Old `test_api.py` backward compatibility maintained
+- [ ] Deploy to Railway and run integration tests against production
+
+---
+
+## Backward Compatibility Strategy
+
+Old `test_api.py` sends generic `MoveAction` format. New code will:
+- Accept both old `moves: List[MoveAction]` and new `actions: List[RoundAction]` formats
+- Convert old format to new internally
+- Keep old test passing through all phases
+- Add new `test_full_game.py` for comprehensive testing
+
+---
+
+## Project Structure
 
 ```
 /Users/family/Projects/Git/robot_battle/
-├── README.md                   # Project overview
-├── STATUS.md                   # This file
-├── claude.md                   # Development guide
-├── api_architecture.md         # Backend architecture
-├── godot_architecture.md       # Game client architecture
-├── test_api.py                 # Integration test script
-├── backend/                    # FastAPI application
-│   ├── main.py                 # FastAPI app entry point
-│   ├── models.py               # Pydantic models
-│   ├── redis_client.py         # Redis data access
-│   ├── auth.py                 # Authentication
-│   ├── game_logic.py           # Game processing
-│   ├── config.py               # Configuration
-│   ├── requirements.txt        # Dependencies
-│   ├── Procfile                # Railway config
-│   ├── runtime.txt             # Python version
-│   ├── .env.example            # Environment template
-│   ├── .gitignore              # Git ignore
-│   └── README.md               # Backend docs
-└── game_client/                # Empty (future Godot project)
+├── STATUS.md                         # This file
+├── CLAUDE.md                         # Project overview for Claude Code
+├── README.md                         # Project README
+├── api_architecture.md               # Original backend architecture design
+├── godot_architecture.md             # Game client architecture (future)
+├── robot_game_backend_mechanics.md   # Game rules - turn processing ← KEY REFERENCE
+├── robot_game_client_mechanics.md    # Game rules - client gameplay ← KEY REFERENCE
+├── test_api.py                       # Integration tests (Phase 1 passing)
+├── backend/                          # FastAPI application
+│   ├── main.py                       # API endpoints (6 working)
+│   ├── models.py                     # Pydantic models (8 basic, expanding in 2a)
+│   ├── redis_client.py               # Redis data access (expanding in 2b)
+│   ├── auth.py                       # API key authentication
+│   ├── game_logic.py                 # Game processing (stub, rewriting in 2d)
+│   ├── config.py                     # Configuration
+│   ├── requirements.txt
+│   ├── Procfile                      # Railway: uvicorn main:app
+│   └── runtime.txt                   # Python 3.11.7
+└── game_client/                      # Empty (Phase 3: Godot client)
 ```
 
 ---
 
-## 🎯 Success Criteria
-
-The deployment is complete when:
-
-1. ✅ All backend files committed to main branch
-2. ⏳ Backend service deployed successfully on Railway
-3. ⏳ Health endpoint returns `{"status": "healthy", "redis": true}`
-4. ⏳ Integration test script passes all tests
-5. ⏳ Complete game flow works (create → join → submit → results)
-
-**Current Progress:** 1/5 complete
-
----
-
-## 🚀 Commands Quick Reference
+## Quick Reference
 
 ```bash
+# Test current deployed API
+python test_api.py https://robotbattle-production.up.railway.app
+
+# Check health
+curl https://robotbattle-production.up.railway.app/health
+
+# Railway operations (must be in project directory)
+railway link          # Link CLI to Railway project
+railway logs          # View deployment logs
+railway status        # Check service status
+
 # Git operations
-git status
-git checkout test1
 git checkout main
-git pull
-
-# Railway operations
-railway login
-railway status
-railway logs --tail 50
-railway domain
-railway variables
-
-# Testing
-python test_api.py http://localhost:8000        # Local test
-python test_api.py https://YOUR-URL.railway.app # Railway test
-
-# Check if Redis is running locally (if testing locally)
-redis-cli ping
-
-# Run FastAPI locally (if needed)
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-uvicorn main:app --reload
+git checkout test1
+git push origin main  # Triggers Railway auto-deploy
 ```
 
 ---
 
-## 📞 Where We Left Off
+## Railway Setup Checklist
 
-**What was happening:**
-- Backend code is fully implemented and merged to main
-- Railway deployment was failing due to pydantic-core build error
-- Added `runtime.txt` to fix the Python version issue
-- Fix is merged to main, but Railway needs to redeploy
-
-**What to do first tomorrow:**
-1. Login to Railway CLI: `railway login`
-2. Check Railway dashboard to see if redeploy happened automatically
-3. If not, trigger redeploy manually
-4. Get the backend API URL
-5. Test health endpoint
-6. Run integration tests
-
-**Expected time to complete:** 15-30 minutes if deployment works correctly
+- [x] Redis service running
+- [x] Backend service deployed and reachable
+- [x] Backend service linked to GitHub repo `robot_battle`
+- [x] Backend service root directory: `/backend`
+- [x] `REDIS_URL` environment variable set
+- [x] `API_SECRET` environment variable set
+- [ ] `ENVIRONMENT` set to `production` (currently shows "development" — typo in Railway dashboard)
+- [x] Health endpoint returns `{"status":"healthy","redis":true}`
 
 ---
 
-## 📝 Notes
+## Phase 3 Preview: Godot Client
 
-- The backend API is fully functional (all code is complete)
-- The only remaining task is getting it deployed on Railway
-- Once deployed, the integration test script will validate everything works
-- After successful deployment, we can move on to building the Godot game client
-- Redis is already running and healthy on Railway
-- All environment variables are configured correctly
-
----
-
-**Good luck tomorrow! 🚀**
+After Phase 2 is complete:
+- Build Godot 4.x game client following `godot_architecture.md`
+- Implement APIClient autoload singleton
+- Build UI: main menu, lobby, game view
+- Implement hex map rendering
+- Add turn submission and polling logic
+- Test full multiplayer game
