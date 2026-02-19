@@ -104,19 +104,19 @@ class FullGameTester:
         resp = self.post(f"/game/{game_id}/team/{team}/assign_roles",
                          {"team": team, "role_assignments": role_assignments},
                          api_key=api_key)
-        if resp and resp.status_code == 200:
+        if resp is None:
+            return None
+        if resp.status_code == 200:
             return resp.json()
-        if resp:
-            return {"error": resp.text, "status_code": resp.status_code}
-        return None
+        return {"error": resp.text, "status_code": resp.status_code}
 
     def spawn_robots(self, game_id: str, api_key: str) -> Optional[dict]:
         resp = self.post(f"/game/{game_id}/spawn_robots", api_key=api_key)
-        if resp and resp.status_code == 200:
+        if resp is None:
+            return None
+        if resp.status_code == 200:
             return resp.json()
-        if resp:
-            return {"error": resp.text, "status_code": resp.status_code}
-        return None
+        return {"error": resp.text, "status_code": resp.status_code}
 
     def get_initial_state(self, game_id: str, api_key: str) -> Optional[dict]:
         resp = self.get(f"/game/{game_id}/initial_state", api_key=api_key)
@@ -129,11 +129,11 @@ class FullGameTester:
         resp = self.post(f"/game/{game_id}/submit",
                          {"turn": turn, "actions": actions},
                          api_key=api_key)
-        if resp and resp.status_code == 200:
+        if resp is None:
+            return None
+        if resp.status_code == 200:
             return resp.json()
-        if resp:
-            return {"error": resp.text, "status_code": resp.status_code}
-        return None
+        return {"error": resp.text, "status_code": resp.status_code}
 
     def poll_results(self, game_id: str, turn: int, api_key: str,
                      timeout: int = 15) -> Optional[dict]:
