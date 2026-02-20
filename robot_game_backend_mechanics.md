@@ -2,12 +2,51 @@
 
 Describes game start after initialization and how the backend should combine the collective set of moves submitted by the players and produce a result
 
-This description of the backend does not cover the mechanics by which 4 or 6 players are assigned to the same game.
+**Related Documentation:**
+- [api_architecture.md](./api_architecture.md) - Complete API endpoint specifications
+- [INVITE_CODE_GUIDE.md](./INVITE_CODE_GUIDE.md) - User guide for invite code system
+- [robot_game_client_mechanics.md](./robot_game_client_mechanics.md) - Client-side game mechanics
 
 ## **Prerequisites**
 
-* Four or six players have exchanged information with the backed sufficient for each player to be uniquely identified
+* Four or six players have joined the game and been assigned to teams via the invite code system (see **Team Assignment** below)
+* Each player has been uniquely identified with a player_id and API key
 * The **Game Variables** were submitted by the player initiating the game sufficient to generate a map, generate Robots of correct types and number, assign Robots to players, set initial settings for Robots
+
+## **Team Assignment**
+
+### Game Creation and Invite Codes
+
+When a player creates a new game via `POST /game/create`, the backend:
+1. Creates a unique game_id
+2. Generates **two invite codes** using a 3-word memorable format (e.g., `golden-dragon-castle`)
+   - **team_0_invite_code**: Share with your teammates
+   - **team_1_invite_code**: Share with opponents
+3. Returns both codes to the creator
+4. Creator is automatically assigned to Team 0
+
+### Joining with Invite Codes
+
+Players join via `POST /game/invite/{invite_code}/join`:
+- The invite code determines which team they join (Team 0 or Team 1)
+- Backend validates:
+  - Code exists and hasn't expired
+  - Game is accepting players (`waiting_for_players` state)
+  - The team encoded in the code has available slots (max_players / 2)
+- Player receives their player_id, API key, and team assignment
+- When all slots are filled (4 or 6 players total), game transitions to `in_progress`
+
+### Team Composition
+
+**2v2 Games (4 players):**
+- Team 0: 2 players (creator + 1 who used team_0_code)
+- Team 1: 2 players (both used team_1_code)
+
+**3v3 Games (6 players):**
+- Team 0: 3 players (creator + 2 who used team_0_code)
+- Team 1: 3 players (all used team_1_code)
+
+**Key Advantage:** The creator controls team composition by sharing specific codes with intended teammates vs. opponents, eliminating the unpredictability of auto-assignment by join order.
 
 ## **Game Variables**
 
