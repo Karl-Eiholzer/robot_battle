@@ -2,6 +2,10 @@
 
 Describes game set-up and how turns are input by the Godot game client
 
+**Related Documentation:**
+- [INVITE_CODE_GUIDE.md](./INVITE_CODE_GUIDE.md) - Visual guide for invite code system
+- [robot_game_backend_mechanics.md](./robot_game_backend_mechanics.md) - Backend game mechanics
+
 ## Overview
 
 Each player has a robot that is "Captain" and multiple other robots. Your team wins if one of your robots legally moves into the hex occupied by the other team's "Captain", which is called "Capture".
@@ -10,12 +14,12 @@ Players are trying to keep their Captain from being captured while simultaneousl
 
 ### Full game steps
 
-1. One player initiates the game and gets a "game ID" to share with other players. This player sets game variables. See **Game Variables** below
-2. Other players obtain the game ID and enter the same game
-3. Players signal readiness and the player who initiated the game assigns roles to each player on their team. See **Player Roles** below.
-4.  by downloading the map. See **Initial Download** below
-5. Game starts and proceeds in a series of "turns" where all players enter their moves for that "turn" at the same time and all players get the results back at the same time.  Each turn consists of 6 rounds - see **Player options within a turn** below
-6. Turns continue until win condition is met for one teams. When the win condition is met, backend processing stops and a final replay and score are sent to the players. See **Single turn steps** below
+1. **Game Creation:** One player initiates the game and receives **two invite codes** (one for each team). This player sets game variables. See **Game Variables** below
+2. **Team Formation:** The creator shares the **Team 0 code** with intended teammates and the **Team 1 code** with opponents. Players join by entering their invite code, which automatically assigns them to the correct team.
+3. **Role Assignment:** Once all players have joined (4 for 2v2, or 6 for 3v3), each team assigns player roles. See **Player Roles** below.
+4. **Robot Spawning:** After both teams have assigned roles, robots are spawned and players download the initial map state.
+5. **Gameplay:** Game proceeds in a series of "turns" where all players enter their moves for that "turn" simultaneously and all players get the results back at the same time. Each turn consists of 6 rounds - see **Player options within a turn** below
+6. **Win Condition:** Turns continue until the win condition is met for one team. When the win condition is met, backend processing stops and a final replay and score are sent to the players. See **Single turn steps** below
 
 ### Single turn steps
 
@@ -66,10 +70,87 @@ While player is inputting actions Timer 2 displays on the screen. When initial t
 When Timer 3 elapses, the game auto-submits the set of actions for the player. Note that actions default to "wait" action if no other action was written over that action.
 
 
+## **Invite Code System**
+
+### How Invite Codes Work
+
+When a game is created, the backend generates two unique 3-word codes:
+- **Format:** `adjective-noun-object` (e.g., `golden-dragon-castle`)
+- **Team 0 Code:** Determines Team 0 membership
+- **Team 1 Code:** Determines Team 1 membership
+
+**Key Features:**
+- Memorable and easy to share verbally or via text
+- ~84,000 possible unique combinations
+- Auto-expire when the game ends
+- Cannot be reused across different games
+
+**Team Control:**
+The creator controls who plays on which team by deciding who gets which code:
+- Share Team 0 code only with intended teammates
+- Share Team 1 code only with intended opponents
+- No risk of friends accidentally ending up on opposing teams
+
+### Example Flow
+
+**Creator (Alice):**
+1. Creates game → receives codes:
+   - Team 0: `swift-laser-fortress`
+   - Team 1: `shadow-tiger-moon`
+2. Texts Bob: "Join Team 0: swift-laser-fortress"
+3. Tells Carol: "Join Team 1: shadow-tiger-moon"
+
+**Bob (Teammate):**
+1. Enters name: "Bob"
+2. Pastes: `swift-laser-fortress`
+3. Joins as Team 0 ✓
+
+**Carol (Opponent):**
+1. Enters name: "Carol"
+2. Pastes: `shadow-tiger-moon`
+3. Joins as Team 1 ✓
+
 ## **Game Start**
 
-* Players should be prompted to provide a username. If none is provided, a humorous username is auto-generated and click "Ready"
-* When all players select "Ready", the player that initiated the game assigns player role to each player.
+### Joining a Game
+
+**Creating a Game:**
+1. Player enters their name in the main menu
+2. Selects team size (2v2 or 3v3) and other game variables
+3. Clicks "Create New Game"
+4. Receives two invite codes displayed on screen:
+   - **Team 0 Code** (green) - for their teammates
+   - **Team 1 Code** (red) - for opponents
+5. Can copy each code separately to share via chat/voice
+
+**Joining a Game:**
+1. Player enters their name in the main menu
+2. Pastes the invite code they received from the creator
+3. Clicks "Join Game"
+4. Automatically assigned to Team 0 or Team 1 based on which code was used
+5. Waits for all player slots to fill (2 per team for 2v2, 3 per team for 3v3)
+
+### Role Assignment Phase
+
+Once all players have joined:
+1. Game transitions from `waiting_for_players` to `in_progress` state
+2. Each team sees the role assignment screen
+3. **Each player assigns their own role** by selecting from available options:
+   - 2v2 teams: Captain or Huntsman
+   - 3v3 teams: Captain, Huntsman, or Engineer
+4. Backend validates that each team has exactly one of each required role
+5. Any player on a team can click "Spawn Robots" once both teams have assigned all roles
+
+### Initial State Download
+
+After robots are spawned:
+1. Each player downloads the initial game state via `GET /game/{game_id}/initial_state`
+2. Includes:
+   - Player's own robots (full data: type, position, energy)
+   - Visible enemy robots (limited by fog of war based on sight range)
+   - Map terrain and hex objects
+   - Which team has initiative for turn 0
+3. Game view loads with all robots on the hex map
 
 ## **Robot Types**
 
