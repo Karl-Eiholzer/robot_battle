@@ -63,7 +63,7 @@ func _build_role_ui() -> void:
 	var available_roles = ROLES_3 if _team_size == 3 else ROLES_2
 
 	var hbox = HBoxContainer.new()
-	hbox.theme_override_constants.separation = 12
+	hbox.add_theme_constant_override("separation", 12)
 	roles_container.add_child(hbox)
 
 	var lbl = Label.new()
@@ -107,11 +107,11 @@ func _on_spawn_pressed() -> void:
 
 # ==================== API Response Handlers ====================
 
-func _on_roles_assigned(data: Dictionary) -> void:
+func _on_roles_assigned(_data: Dictionary) -> void:
 	_show_status("Role assigned! Waiting for all players and both teams to assign roles, then any player can spawn robots.")
 	spawn_btn.disabled = false
 
-func _on_robots_spawned(data: Dictionary) -> void:
+func _on_robots_spawned(_data: Dictionary) -> void:
 	_show_status("Robots spawned! Loading game state...")
 	APIClient.get_initial_state(GameState.game_id)
 
