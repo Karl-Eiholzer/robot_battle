@@ -315,14 +315,14 @@ class APITester:
             return False
 
         # Test 3: Join game with 3 additional players
-        # Players 2 and 4 join team 0, player 3 joins team 1
+        # Player 2 joins team 0, Players 3&4 join team 1
         if not self.test_join_game("Player2", self.team_0_code):
             self.log_error("Player 2 join failed")
             return False
         if not self.test_join_game("Player3", self.team_1_code):
             self.log_error("Player 3 join failed")
             return False
-        if not self.test_join_game("Player4", self.team_0_code):
+        if not self.test_join_game("Player4", self.team_1_code):
             self.log_error("Player 4 join failed")
             return False
 
