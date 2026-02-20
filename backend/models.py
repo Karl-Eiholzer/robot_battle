@@ -197,8 +197,16 @@ class CreateGameResponse(BaseModel):
     game_id: str
     creator_player_id: str
     api_key: str
+    team_0_invite_code: str  # Share with your team
+    team_1_invite_code: str  # Share with opponents
     state: str
     max_players: int
+    team: int  # 0 or 1 (creator is always team 0)
+
+
+class InviteCodeJoinRequest(BaseModel):
+    """Request body for joining via invite code"""
+    player_name: str
 
 
 class JoinGameResponse(BaseModel):
@@ -210,6 +218,7 @@ class JoinGameResponse(BaseModel):
     current_players: int
     max_players: int
     state: str
+    team: int  # 0 or 1 (assigned by invite code)
 
 
 class GameStatusResponse(BaseModel):

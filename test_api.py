@@ -35,6 +35,8 @@ class APITester:
         self.base_url = base_url.rstrip('/')
         self.api_keys = {}  # player_id → api_key
         self.game_id = None
+        self.team_0_code = None
+        self.team_1_code = None
         self.player_ids = []
         self.tests_passed = 0
         self.tests_failed = 0
@@ -106,13 +108,16 @@ class APITester:
                 self.game_id = data["game_id"]
                 creator_id = data["creator_player_id"]
                 api_key = data["api_key"]
+                self.team_0_code = data["team_0_invite_code"]
+                self.team_1_code = data["team_1_invite_code"]
 
                 self.player_ids.append(creator_id)
                 self.api_keys[creator_id] = api_key
 
                 self.log_success(f"Game created: {self.game_id}")
                 self.log_info(f"Creator ID: {creator_id}")
-                self.log_info(f"API Key: {api_key[:20]}...")
+                self.log_info(f"Team 0 Code: {self.team_0_code}")
+                self.log_info(f"Team 1 Code: {self.team_1_code}")
                 self.log_info(f"State: {data['state']}")
 
                 return True
@@ -125,12 +130,12 @@ class APITester:
             self.log_error(f"Create game exception: {str(e)}")
             return False
 
-    def test_join_game(self, player_name: str) -> bool:
-        """Test joining a game"""
-        self.log_test(f"Join Game as {player_name}")
+    def test_join_game(self, player_name: str, invite_code: str) -> bool:
+        """Test joining a game via invite code"""
+        self.log_test(f"Join Game as {player_name} with code {invite_code}")
 
-        if not self.game_id:
-            self.log_error("No game_id available")
+        if not invite_code:
+            self.log_error("No invite code available")
             return False
 
         payload = {
@@ -139,7 +144,7 @@ class APITester:
 
         try:
             response = requests.post(
-                f"{self.base_url}/game/{self.game_id}/join",
+                f"{self.base_url}/game/invite/{invite_code}/join",
                 json=payload
             )
 
@@ -147,11 +152,12 @@ class APITester:
                 data = response.json()
                 player_id = data["player_id"]
                 api_key = data["api_key"]
+                team = data["team"]
 
                 self.player_ids.append(player_id)
                 self.api_keys[player_id] = api_key
 
-                self.log_success(f"{player_name} joined the game")
+                self.log_success(f"{player_name} joined the game as Team {team}")
                 self.log_info(f"Player ID: {player_id}")
                 self.log_info(f"Current players: {data['current_players']}/{data['max_players']}")
                 self.log_info(f"Game state: {data['state']}")
@@ -309,10 +315,16 @@ class APITester:
             return False
 
         # Test 3: Join game with 3 additional players
-        for i in range(2, 5):
-            if not self.test_join_game(f"Player{i}"):
-                self.log_error(f"Player {i} join failed")
-                return False
+        # Players 2 and 4 join team 0, player 3 joins team 1
+        if not self.test_join_game("Player2", self.team_0_code):
+            self.log_error("Player 2 join failed")
+            return False
+        if not self.test_join_game("Player3", self.team_1_code):
+            self.log_error("Player 3 join failed")
+            return False
+        if not self.test_join_game("Player4", self.team_0_code):
+            self.log_error("Player 4 join failed")
+            return False
 
         time.sleep(1)  # Brief pause
 

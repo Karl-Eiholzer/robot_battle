@@ -155,6 +155,37 @@ class RedisClient:
             "team": int(data.get("team", 0))
         }
 
+    def get_team_player_count(self, game_id: str, team: int) -> int:
+        """Get current player count for a specific team"""
+        players = self.get_game_players(game_id)
+        count = 0
+        for player_id in players:
+            player_info = self.get_player_info(game_id, player_id)
+            if player_info and player_info.get("team") == team:
+                count += 1
+        return count
+
+    # ==================== Invite Codes ====================
+
+    def store_invite_code(self, invite_code: str, game_id: str, team: int, ttl: int):
+        """Store invite code mapping to game_id and team"""
+        key = f"invite_code:{invite_code}"
+        data = {"game_id": game_id, "team": team}
+        self.client.setex(key, ttl, json.dumps(data))
+
+    def get_invite_code_info(self, invite_code: str) -> Optional[Dict]:
+        """Get game_id and team from invite code"""
+        key = f"invite_code:{invite_code}"
+        data = self.client.get(key)
+        if data:
+            return json.loads(data)
+        return None
+
+    def delete_invite_code(self, invite_code: str):
+        """Delete an invite code (when game ends or code revoked)"""
+        key = f"invite_code:{invite_code}"
+        self.client.delete(key)
+
     # ==================== Game Map ====================
 
     def store_game_map(self, game_id: str, map_data: Dict[str, Any]):

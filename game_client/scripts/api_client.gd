@@ -36,15 +36,16 @@ func _ready() -> void:
 
 func create_game(player_name: String, team_size: int) -> void:
 	var body = {
+		"player_name": player_name,
 		"max_players": team_size * 2,
 		"map_config": {"width": 15, "height": 15},
 		"game_variables": {"team_size": team_size}
 	}
 	_enqueue("/game/create", HTTPClient.METHOD_POST, body, "game_created")
 
-func join_game(game_id: String, player_name: String) -> void:
+func join_game_by_code(invite_code: String, player_name: String) -> void:
 	var body = {"player_name": player_name}
-	_enqueue("/game/" + game_id + "/join", HTTPClient.METHOD_POST, body, "game_joined")
+	_enqueue("/game/invite/" + invite_code + "/join", HTTPClient.METHOD_POST, body, "game_joined")
 
 func get_status(game_id: String) -> void:
 	_enqueue("/game/" + game_id + "/status", HTTPClient.METHOD_GET, {}, "game_status_received")

@@ -5,11 +5,16 @@ extends Control
 @onready var player_name_input: LineEdit = $CenterContainer/VBox/PlayerNameInput
 @onready var team_size_option: OptionButton = $CenterContainer/VBox/TeamSizeOption
 @onready var create_game_btn: Button = $CenterContainer/VBox/CreateGameBtn
-@onready var game_id_input: LineEdit = $CenterContainer/VBox/GameIDInput
+@onready var invite_code_input: LineEdit = $CenterContainer/VBox/InviteCodeInput
 @onready var join_game_btn: Button = $CenterContainer/VBox/JoinGameBtn
 @onready var status_label: Label = $CenterContainer/VBox/StatusLabel
 @onready var error_label: Label = $CenterContainer/VBox/ErrorLabel
-@onready var game_id_display: Label = $CenterContainer/VBox/GameIDDisplay
+@onready var team_0_code_label: Label = $CenterContainer/VBox/Team0CodeLabel
+@onready var team_0_code_display: Label = $CenterContainer/VBox/Team0CodeDisplay
+@onready var copy_team_0_btn: Button = $CenterContainer/VBox/CopyTeam0Btn
+@onready var team_1_code_label: Label = $CenterContainer/VBox/Team1CodeLabel
+@onready var team_1_code_display: Label = $CenterContainer/VBox/Team1CodeDisplay
+@onready var copy_team_1_btn: Button = $CenterContainer/VBox/CopyTeam1Btn
 @onready var poll_timer: Timer = $PollTimer
 
 # ==================== State ====================
@@ -27,12 +32,12 @@ func _ready() -> void:
 	# Pre-fill from saved state if available
 	if GameState.player_name != "":
 		player_name_input.text = GameState.player_name
-	if GameState.game_id != "":
-		game_id_input.text = GameState.game_id
 
 	# Connect buttons
 	create_game_btn.pressed.connect(_on_create_pressed)
 	join_game_btn.pressed.connect(_on_join_pressed)
+	copy_team_0_btn.pressed.connect(_on_copy_team_0_pressed)
+	copy_team_1_btn.pressed.connect(_on_copy_team_1_pressed)
 	poll_timer.timeout.connect(_on_poll_timer)
 
 	# Connect API signals
@@ -56,32 +61,57 @@ func _on_create_pressed() -> void:
 
 func _on_join_pressed() -> void:
 	var pname = player_name_input.text.strip_edges()
-	var gid = game_id_input.text.strip_edges()
+	var code = invite_code_input.text.strip_edges()
 	if pname == "":
 		_show_error("Please enter your name.")
 		return
-	if gid == "":
-		_show_error("Please enter a game ID.")
+	if code == "":
+		_show_error("Please enter an invite code.")
 		return
 
 	GameState.player_name = pname
 	_set_waiting(true, "Joining game...")
-	APIClient.join_game(gid, pname)
+	APIClient.join_game_by_code(code, pname)
+
+func _on_copy_team_0_pressed() -> void:
+	var code = team_0_code_display.text
+	if code != "":
+		DisplayServer.clipboard_set(code)
+		_show_status("Team 0 code copied! Share with your teammates.")
+
+func _on_copy_team_1_pressed() -> void:
+	var code = team_1_code_display.text
+	if code != "":
+		DisplayServer.clipboard_set(code)
+		_show_status("Team 1 code copied! Share with opponents.")
 
 # ==================== API Response Handlers ====================
 
 func _on_game_created(data: Dictionary) -> void:
 	GameState.initialize_from_create_response(data)
-	_show_status("Game created! Share this ID with your friends:")
-	game_id_display.text = GameState.game_id
+
+	# Show both invite codes
+	var team_0_code = data.get("team_0_invite_code", "")
+	var team_1_code = data.get("team_1_invite_code", "")
+
+	team_0_code_display.text = team_0_code
+	team_1_code_display.text = team_1_code
+
+	team_0_code_label.visible = true
+	team_0_code_display.visible = true
+	copy_team_0_btn.visible = true
+	team_1_code_label.visible = true
+	team_1_code_display.visible = true
+	copy_team_1_btn.visible = true
+
+	_show_status("Game created! Share codes with players:")
 	_set_waiting(true, "Waiting for players to join...")
 	poll_timer.start()
 
 func _on_game_joined(data: Dictionary) -> void:
 	GameState.initialize_from_join_response(data)
 	var state = data.get("state", "")
-	_show_status("Joined game " + GameState.game_id)
-	game_id_display.text = "Game ID: " + GameState.game_id
+	_show_status("Joined game as Team %d" % GameState.player_team)
 
 	if state == "in_progress":
 		_transition_forward()
@@ -102,7 +132,7 @@ func _on_status_received(data: Dictionary) -> void:
 		_:
 			_show_status("Game state: " + state)
 
-func _on_request_failed(endpoint: String, status_code: int, body: String) -> void:
+func _on_request_failed(_endpoint: String, status_code: int, body: String) -> void:
 	_set_waiting(false, "")
 	poll_timer.stop()
 	_show_error("Error (%d): %s" % [status_code, body])

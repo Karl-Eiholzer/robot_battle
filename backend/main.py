@@ -8,6 +8,7 @@ import asyncio
 from models import (
     CreateGameRequest, CreateGameResponse,
     JoinGameRequest, JoinGameResponse,
+    InviteCodeJoinRequest,
     GameStatusResponse,
     SubmitMoveRequest, SubmitMoveResponse,
     TurnResultsResponse,
@@ -108,28 +109,50 @@ async def create_game(request: CreateGameRequest):
     redis_client.store_player_info(game_id, creator_id, "Creator", team=0)
     redis_client.set_player_current_game(creator_id, game_id)
 
+    # Generate invite codes
+    from invite_codes import generate_invite_code
+    team_0_code = generate_invite_code(redis_client)
+    team_1_code = generate_invite_code(redis_client)
+
+    # Store invite code mappings
+    redis_client.store_invite_code(team_0_code, game_id, team=0, ttl=Config.TTL_ACTIVE_GAME)
+    redis_client.store_invite_code(team_1_code, game_id, team=1, ttl=Config.TTL_ACTIVE_GAME)
+
     return CreateGameResponse(
         game_id=game_id,
         creator_player_id=creator_id,
         api_key=api_key,
+        team_0_invite_code=team_0_code,
+        team_1_invite_code=team_1_code,
         state="waiting_for_players",
-        max_players=request.max_players
+        max_players=request.max_players,
+        team=0  # Creator is always team 0
     )
 
 
 # ==================== Join Game ====================
 
-@app.post("/game/{game_id}/join", response_model=JoinGameResponse)
-async def join_game(game_id: str, request: JoinGameRequest):
+@app.post("/game/invite/{invite_code}/join", response_model=JoinGameResponse)
+async def join_game_by_invite_code(invite_code: str, request: InviteCodeJoinRequest):
     """
-    Join an existing game
-
+    Join a game using an invite code
+    - Looks up game_id and team from invite code
     - Verifies game exists and is accepting players
-    - Generates player_id and API key
-    - Adds player to game
-    - Returns full map data
+    - Verifies team has space available
+    - Assigns player to the team encoded in the invite code
     """
-    # Check if game exists
+    # Lookup invite code
+    invite_info = redis_client.get_invite_code_info(invite_code)
+    if not invite_info:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid or expired invite code"
+        )
+
+    game_id = invite_info["game_id"]
+    assigned_team = invite_info["team"]
+
+    # Verify game exists
     if not redis_client.game_exists(game_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -146,11 +169,13 @@ async def join_game(game_id: str, request: JoinGameRequest):
             detail="Game is not accepting new players"
         )
 
-    # Check if game is full
-    if game_meta["player_count"] >= game_meta["max_players"]:
+    # Check if team has space
+    team_size = game_meta["max_players"] // 2
+    team_count = redis_client.get_team_player_count(game_id, assigned_team)
+    if team_count >= team_size:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Game is full"
+            detail=f"Team {assigned_team} is full"
         )
 
     # Generate player credentials
@@ -158,21 +183,15 @@ async def join_game(game_id: str, request: JoinGameRequest):
     api_key = generate_api_key()
     store_player_key(player_id, api_key)
 
-    # Assign team: first half of players go to team 0, second half to team 1
-    current_count = game_meta["player_count"]
-    max_players = game_meta["max_players"]
-    team = 0 if current_count < max_players // 2 else 1
-
-    # Add player to game
+    # Add player to game with assigned team
     redis_client.add_player_to_game(game_id, player_id)
-    redis_client.store_player_info(game_id, player_id, request.player_name, team=team)
+    redis_client.store_player_info(game_id, player_id, request.player_name, team=assigned_team)
     redis_client.set_player_current_game(player_id, game_id)
 
     # Get updated player count
     updated_meta = redis_client.get_game_meta(game_id)
 
-    # Auto-transition to in_progress when game is full (for backward compatibility)
-    # Games using the new flow will explicitly call spawn_robots to start
+    # Auto-transition to in_progress when game is full
     if updated_meta["player_count"] >= updated_meta["max_players"]:
         redis_client.update_game_state(game_id, "in_progress")
         updated_meta["state"] = "in_progress"
@@ -187,7 +206,8 @@ async def join_game(game_id: str, request: JoinGameRequest):
         map=map_data,
         current_players=updated_meta["player_count"],
         max_players=updated_meta["max_players"],
-        state=updated_meta["state"]
+        state=updated_meta["state"],
+        team=assigned_team  # Team determined by invite code
     )
 
 

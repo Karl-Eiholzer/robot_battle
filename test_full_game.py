@@ -93,8 +93,8 @@ class FullGameTester:
             return resp.json()
         return None
 
-    def join_game(self, game_id: str, player_name: str) -> Optional[dict]:
-        resp = self.post(f"/game/{game_id}/join", {"player_name": player_name})
+    def join_game_by_code(self, invite_code: str, player_name: str) -> Optional[dict]:
+        resp = self.post(f"/game/invite/{invite_code}/join", {"player_name": player_name})
         if resp and resp.status_code == 200:
             return resp.json()
         return None
@@ -161,17 +161,34 @@ class FullGameTester:
         game_id = game["game_id"]
         creator_id = game["creator_player_id"]
         creator_key = game["api_key"]
+        team_0_code = game["team_0_invite_code"]
+        team_1_code = game["team_1_invite_code"]
         self.log_success(f"Game created: {game_id}")
+        self.log_info(f"Team 0 code: {team_0_code}, Team 1 code: {team_1_code}")
 
-        # Join 3 more players
+        # Join 3 more players using invite codes
+        # Player 2 joins team 0, players 3&4 join team 1
         self.log_test("Join 3 more players")
         players = [{"id": creator_id, "key": creator_key, "name": "Creator"}]
-        for i in range(1, 4):
-            p = self.join_game(game_id, f"Player{i+1}")
-            if not p:
-                self.log_error(f"Player{i+1} failed to join")
-                return False
-            players.append({"id": p["player_id"], "key": p["api_key"], "name": f"Player{i+1}"})
+
+        p = self.join_game_by_code(team_0_code, "Player2")
+        if not p:
+            self.log_error("Player2 failed to join")
+            return False
+        players.append({"id": p["player_id"], "key": p["api_key"], "name": "Player2"})
+
+        p = self.join_game_by_code(team_1_code, "Player3")
+        if not p:
+            self.log_error("Player3 failed to join")
+            return False
+        players.append({"id": p["player_id"], "key": p["api_key"], "name": "Player3"})
+
+        p = self.join_game_by_code(team_1_code, "Player4")
+        if not p:
+            self.log_error("Player4 failed to join")
+            return False
+        players.append({"id": p["player_id"], "key": p["api_key"], "name": "Player4"})
+
         self.log_success(f"4 players joined: {[p['name'] for p in players]}")
 
         # Assign roles: team 0 gets captain + huntsman, team 1 gets captain + huntsman
@@ -287,15 +304,29 @@ class FullGameTester:
         game_id = game["game_id"]
         creator_key = game["api_key"]
         creator_id = game["creator_player_id"]
+        team_0_code = game["team_0_invite_code"]
+        team_1_code = game["team_1_invite_code"]
 
-        # Join 3 more players
+        # Join 3 more players using invite codes
         players = [{"id": creator_id, "key": creator_key}]
-        for i in range(1, 4):
-            p = self.join_game(game_id, f"P{i+1}")
-            if not p:
-                self.log_error("Player join failed")
-                return False
-            players.append({"id": p["player_id"], "key": p["api_key"]})
+
+        p = self.join_game_by_code(team_0_code, "P2")
+        if not p:
+            self.log_error("P2 join failed")
+            return False
+        players.append({"id": p["player_id"], "key": p["api_key"]})
+
+        p = self.join_game_by_code(team_1_code, "P3")
+        if not p:
+            self.log_error("P3 join failed")
+            return False
+        players.append({"id": p["player_id"], "key": p["api_key"]})
+
+        p = self.join_game_by_code(team_1_code, "P4")
+        if not p:
+            self.log_error("P4 join failed")
+            return False
+        players.append({"id": p["player_id"], "key": p["api_key"]})
 
         # Assign roles
         self.assign_roles(game_id, 0,
@@ -438,16 +469,45 @@ class FullGameTester:
         game_id = game["game_id"]
         creator_key = game["api_key"]
         creator_id = game["creator_player_id"]
+        team_0_code = game["team_0_invite_code"]
+        team_1_code = game["team_1_invite_code"]
         self.log_success(f"3v3 game created: {game_id}")
 
-        # Join 5 more players
+        # Join 5 more players using invite codes
+        # Team 0: creator, player2, player4 (3 players)
+        # Team 1: player3, player5, player6 (3 players)
         players = [{"id": creator_id, "key": creator_key}]
-        for i in range(1, 6):
-            p = self.join_game(game_id, f"Player{i+1}")
-            if not p:
-                self.log_error(f"Player{i+1} failed to join")
-                return False
-            players.append({"id": p["player_id"], "key": p["api_key"]})
+
+        p = self.join_game_by_code(team_0_code, "Player2")
+        if not p:
+            self.log_error("Player2 failed to join")
+            return False
+        players.append({"id": p["player_id"], "key": p["api_key"]})
+
+        p = self.join_game_by_code(team_1_code, "Player3")
+        if not p:
+            self.log_error("Player3 failed to join")
+            return False
+        players.append({"id": p["player_id"], "key": p["api_key"]})
+
+        p = self.join_game_by_code(team_0_code, "Player4")
+        if not p:
+            self.log_error("Player4 failed to join")
+            return False
+        players.append({"id": p["player_id"], "key": p["api_key"]})
+
+        p = self.join_game_by_code(team_1_code, "Player5")
+        if not p:
+            self.log_error("Player5 failed to join")
+            return False
+        players.append({"id": p["player_id"], "key": p["api_key"]})
+
+        p = self.join_game_by_code(team_1_code, "Player6")
+        if not p:
+            self.log_error("Player6 failed to join")
+            return False
+        players.append({"id": p["player_id"], "key": p["api_key"]})
+
         self.log_success(f"6 players joined")
 
         # Assign roles: 3 roles per team for 3-person teams
@@ -543,12 +603,22 @@ class FullGameTester:
         game_id = game["game_id"]
         creator_key = game["api_key"]
         creator_id = game["creator_player_id"]
+        team_0_code = game["team_0_invite_code"]
+        team_1_code = game["team_1_invite_code"]
 
         players = [{"id": creator_id, "key": creator_key}]
-        for i in range(1, 4):
-            p = self.join_game(game_id, f"P{i+1}")
-            if p:
-                players.append({"id": p["player_id"], "key": p["api_key"]})
+
+        p = self.join_game_by_code(team_0_code, "P2")
+        if p:
+            players.append({"id": p["player_id"], "key": p["api_key"]})
+
+        p = self.join_game_by_code(team_1_code, "P3")
+        if p:
+            players.append({"id": p["player_id"], "key": p["api_key"]})
+
+        p = self.join_game_by_code(team_1_code, "P4")
+        if p:
+            players.append({"id": p["player_id"], "key": p["api_key"]})
 
         self.assign_roles(game_id, 0,
                           {players[0]["id"]: "captain", players[1]["id"]: "huntsman"},
@@ -625,13 +695,23 @@ class FullGameTester:
         game_id = game["game_id"]
         creator_key = game["api_key"]
         creator_id = game["creator_player_id"]
+        team_0_code = game["team_0_invite_code"]
+        team_1_code = game["team_1_invite_code"]
 
         # Join players
         players = [{"id": creator_id, "key": creator_key}]
-        for i in range(1, 4):
-            p = self.join_game(game_id, f"P{i+1}")
-            if p:
-                players.append({"id": p["player_id"], "key": p["api_key"]})
+
+        p = self.join_game_by_code(team_0_code, "P2")
+        if p:
+            players.append({"id": p["player_id"], "key": p["api_key"]})
+
+        p = self.join_game_by_code(team_1_code, "P3")
+        if p:
+            players.append({"id": p["player_id"], "key": p["api_key"]})
+
+        p = self.join_game_by_code(team_1_code, "P4")
+        if p:
+            players.append({"id": p["player_id"], "key": p["api_key"]})
 
         # Test: Invalid role name
         self.log_test("Reject invalid role name")
@@ -665,7 +745,8 @@ class FullGameTester:
         game2 = self.create_game(max_players=4, team_size=2)
         if game2:
             game2_id = game2["game_id"]
-            p2 = self.join_game(game2_id, "P2")
+            team_0_code2 = game2["team_0_invite_code"]
+            p2 = self.join_game_by_code(team_0_code2, "P2")
             if p2:
                 valid_result = self.assign_roles(
                     game2_id, 0,
@@ -699,15 +780,29 @@ class FullGameTester:
         game_id = game["game_id"]
         creator_key = game["api_key"]
         creator_id = game["creator_player_id"]
+        team_0_code = game["team_0_invite_code"]
+        team_1_code = game["team_1_invite_code"]
 
-        # Join 3 more players (needed to transition to in_progress in old flow)
+        # Join 3 more players using invite codes
         players = [{"id": creator_id, "key": creator_key}]
-        for i in range(1, 4):
-            p = self.join_game(game_id, f"Player{i+1}")
-            if not p:
-                self.log_error(f"Player{i+1} join failed")
-                return False
-            players.append({"id": p["player_id"], "key": p["api_key"]})
+
+        p = self.join_game_by_code(team_0_code, "Player2")
+        if not p:
+            self.log_error("Player2 join failed")
+            return False
+        players.append({"id": p["player_id"], "key": p["api_key"]})
+
+        p = self.join_game_by_code(team_1_code, "Player3")
+        if not p:
+            self.log_error("Player3 join failed")
+            return False
+        players.append({"id": p["player_id"], "key": p["api_key"]})
+
+        p = self.join_game_by_code(team_1_code, "Player4")
+        if not p:
+            self.log_error("Player4 join failed")
+            return False
+        players.append({"id": p["player_id"], "key": p["api_key"]})
 
         # In old flow, game goes to "in_progress" after enough players join
         # We need to manually set it or use the new flow

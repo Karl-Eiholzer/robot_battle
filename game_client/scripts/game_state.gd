@@ -10,6 +10,8 @@ var player_id: String = ""
 var api_key: String = ""
 var player_name: String = ""
 var player_team: int = -1  # 0 or 1
+var team_0_invite_code: String = ""
+var team_1_invite_code: String = ""
 
 # ==================== Game Config ====================
 
@@ -82,7 +84,9 @@ func initialize_from_create_response(data: Dictionary) -> void:
 	game_id = data.get("game_id", "")
 	player_id = data.get("creator_player_id", "")
 	api_key = data.get("api_key", "")
-	player_team = 0  # Creator is always team 0
+	player_team = data.get("team", 0)  # Should be 0 for creator
+	team_0_invite_code = data.get("team_0_invite_code", "")
+	team_1_invite_code = data.get("team_1_invite_code", "")
 	game_state_str = data.get("state", "waiting_for_players")
 	save_state()
 
@@ -90,9 +94,9 @@ func initialize_from_join_response(data: Dictionary) -> void:
 	game_id = data.get("game_id", "")
 	player_id = data.get("player_id", "")
 	api_key = data.get("api_key", "")
+	player_team = data.get("team", -1)  # Team assigned by backend
 	game_state_str = data.get("state", "waiting_for_players")
 	map_data = data.get("map", {})
-	# Team is determined by join order; we'll get it from initial_state
 	save_state()
 
 func initialize_from_initial_state(data: Dictionary) -> void:
@@ -173,6 +177,8 @@ func save_state() -> void:
 	cfg.set_value("session", "api_key", api_key)
 	cfg.set_value("session", "player_name", player_name)
 	cfg.set_value("session", "player_team", player_team)
+	cfg.set_value("session", "team_0_invite_code", team_0_invite_code)
+	cfg.set_value("session", "team_1_invite_code", team_1_invite_code)
 	cfg.save(SAVE_PATH)
 
 func load_saved_state() -> void:
@@ -183,6 +189,8 @@ func load_saved_state() -> void:
 		api_key = cfg.get_value("session", "api_key", "")
 		player_name = cfg.get_value("session", "player_name", "")
 		player_team = cfg.get_value("session", "player_team", -1)
+		team_0_invite_code = cfg.get_value("session", "team_0_invite_code", "")
+		team_1_invite_code = cfg.get_value("session", "team_1_invite_code", "")
 
 func clear_saved_state() -> void:
 	var cfg = ConfigFile.new()
