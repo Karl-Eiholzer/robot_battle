@@ -34,8 +34,10 @@ var _hex_coords: Dictionary = {}
 var _hex_terrain: Dictionary = {}
 # visible_hexes: set of Vector2i (for fog of war)
 var _visible_hexes: Dictionary = {}
-# highlight_hexes: Dictionary  Vector2i -> Color
+# highlight_hexes: Dictionary  Vector2i -> Color  (deploy targeting, high priority)
 var _highlight_hexes: Dictionary = {}
+# path_highlight_hexes: Dictionary  Vector2i -> Color  (planned move destinations)
+var _path_highlight_hexes: Dictionary = {}
 
 # Robot sprite nodes: robot_id -> RobotSprite node
 var _robot_sprites: Dictionary = {}
@@ -197,6 +199,28 @@ func clear_highlights() -> void:
 	_highlight_hexes.clear()
 	queue_redraw()
 
+# ==================== Move Path Highlights ====================
+
+func update_move_path_highlights(action_plan: Dictionary, robot_lookup: Dictionary) -> void:
+	_path_highlight_hexes.clear()
+	for robot_id in action_plan.keys():
+		var robot = robot_lookup.get(robot_id, {})
+		if robot.is_empty():
+			continue
+		var team = robot.get("team", 0)
+		var rtype = robot.get("type", "captain")
+		var base: Color = RobotSprite.TEAM_COLORS.get(team, {}).get(rtype, Color.WHITE)
+		var highlight = Color(base.r, base.g, base.b, 0.5)
+		for round_data in action_plan.get(robot_id, []):
+			if round_data.get("action_type", "wait") == "move":
+				var after = round_data.get("after_position", [0, 0])
+				_path_highlight_hexes[Vector2i(int(after[0]), int(after[1]))] = highlight
+	queue_redraw()
+
+func clear_move_path_highlights() -> void:
+	_path_highlight_hexes.clear()
+	queue_redraw()
+
 # ==================== Fog of War ====================
 
 func apply_fog_of_war(visible_hexes: Array) -> void:
@@ -239,7 +263,11 @@ func _draw_hex(coord: Vector2i) -> void:
 	var points = _hex_corners(center)
 	draw_colored_polygon(points, color)
 
-	# Highlight overlay
+	# Move path highlight (planned destinations, drawn before deploy highlight)
+	if coord in _path_highlight_hexes:
+		draw_colored_polygon(points, _path_highlight_hexes[coord])
+
+	# Deploy targeting highlight (higher priority, drawn on top)
 	if coord in _highlight_hexes:
 		var hcolor = _highlight_hexes[coord]
 		hcolor.a = 0.45
@@ -280,6 +308,7 @@ func _clear_all() -> void:
 	_hex_terrain.clear()
 	_visible_hexes.clear()
 	_highlight_hexes.clear()
+	_path_highlight_hexes.clear()
 
 	for sprite in _robot_sprites.values():
 		sprite.queue_free()

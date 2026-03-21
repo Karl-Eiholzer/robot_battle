@@ -293,6 +293,7 @@ func _on_select_round(round_num: int) -> void:
 	_update_deploy_button(TurnInput.selected_robot_id)
 
 func _on_action_plan_changed() -> void:
+	hex_map.update_move_path_highlights(TurnInput.action_plan, GameState.robot_lookup)
 	if TurnInput.selected_robot_id != "":
 		_rebuild_action_slots(TurnInput.selected_robot_id)
 		_update_robot_stats(TurnInput.selected_robot_id)
@@ -535,6 +536,7 @@ func _on_phase_changed(new_phase: TurnInput.Phase) -> void:
 			submit_btn.disabled = true
 		TurnInput.Phase.REVIEWING:
 			submit_btn.disabled = true
+			hex_map.clear_move_path_highlights()
 
 func _on_robots_updated() -> void:
 	_rebuild_robot_list()
