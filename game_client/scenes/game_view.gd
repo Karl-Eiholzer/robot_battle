@@ -91,10 +91,23 @@ func _input(event: InputEvent) -> void:
 			if event.pressed:
 				_pan_start_mouse = event.position
 				_pan_start_camera = camera.position
-		elif event.pressed and btn == MOUSE_BUTTON_WHEEL_UP:
-			_apply_zoom(1.15)
-		elif event.pressed and btn == MOUSE_BUTTON_WHEEL_DOWN:
-			_apply_zoom(1.0 / 1.15)
+		elif event.pressed:
+			var pan_step: float = 96.0 / camera.zoom.x
+			match btn:
+				MOUSE_BUTTON_WHEEL_UP:
+					if event.shift_pressed:
+						camera.position.y -= pan_step  # Shift+scroll up = pan up
+					else:
+						_apply_zoom(1.15)
+				MOUSE_BUTTON_WHEEL_DOWN:
+					if event.shift_pressed:
+						camera.position.y += pan_step  # Shift+scroll down = pan down
+					else:
+						_apply_zoom(1.0 / 1.15)
+				MOUSE_BUTTON_WHEEL_LEFT:
+					camera.position.x -= pan_step
+				MOUSE_BUTTON_WHEEL_RIGHT:
+					camera.position.x += pan_step
 	elif event is InputEventMouseMotion and _is_panning:
 		var delta_screen = event.position - _pan_start_mouse
 		camera.position = _pan_start_camera - delta_screen / camera.zoom.x
