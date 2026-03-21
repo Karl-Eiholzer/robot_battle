@@ -24,6 +24,7 @@ extends Node2D
 @onready var camera: Camera2D = $Camera2D
 @onready var zoom_in_btn: Button = $UI/TopBar/ZoomInBtn
 @onready var zoom_out_btn: Button = $UI/TopBar/ZoomOutBtn
+@onready var replay_btn: Button = $UI/RightPanel/RightVBox/ReplayBtn
 
 # ==================== State ====================
 
@@ -37,6 +38,9 @@ var _is_panning: bool = false
 var _pan_start_mouse: Vector2 = Vector2.ZERO
 var _pan_start_camera: Vector2 = Vector2.ZERO
 
+# Last completed turn replay (for re-watching)
+var _last_replay: Dictionary = {}
+
 # ==================== Ready ====================
 
 func _ready() -> void:
@@ -47,6 +51,7 @@ func _ready() -> void:
 	deploy_btn.pressed.connect(_on_deploy_pressed)
 	zoom_in_btn.pressed.connect(_on_zoom_in)
 	zoom_out_btn.pressed.connect(_on_zoom_out)
+	replay_btn.pressed.connect(_replay_last_turn)
 	poll_timer.timeout.connect(_on_poll_timer)
 	input_timer.timeout.connect(_on_input_timer_expired)
 
@@ -507,6 +512,9 @@ func _play_replay(replay: Dictionary, full_results: Dictionary) -> void:
 	# Brief pause after replay
 	await get_tree().create_timer(0.5).timeout
 
+	# Store replay so the player can rewatch it
+	_last_replay = replay
+
 	# Update game state
 	GameState.apply_turn_results(full_results)
 	_hide_overlay()
@@ -514,7 +522,48 @@ func _play_replay(replay: Dictionary, full_results: Dictionary) -> void:
 	if winner != null:
 		_go_to_game_end(winner)
 	else:
+		replay_btn.disabled = false
 		_start_next_turn()
+
+func _replay_last_turn() -> void:
+	if _last_replay.is_empty():
+		return
+
+	# Disable controls during playback
+	replay_btn.disabled = true
+	submit_btn.disabled = true
+	var saved_robot_id = TurnInput.selected_robot_id
+
+	_show_overlay("Replaying turn...")
+
+	# Reset map to the state at the start of the recorded turn
+	hex_map.reset_for_replay(_last_replay)
+
+	# Animate each round (identical logic to _play_replay, no state changes)
+	var rounds = _last_replay.get("rounds", [])
+	var hex_objects_created = _last_replay.get("hex_objects_created", [])
+	var hex_objects_destroyed = _last_replay.get("hex_objects_destroyed", [])
+	for round_idx in range(rounds.size()):
+		var created_this_round: Array = []
+		var destroyed_this_round: Array = []
+		if round_idx == rounds.size() - 1:
+			created_this_round = hex_objects_created
+			destroyed_this_round = hex_objects_destroyed
+		hex_map.animate_replay_round(rounds[round_idx], created_this_round, destroyed_this_round)
+		await get_tree().create_timer(0.6).timeout
+
+	await get_tree().create_timer(0.5).timeout
+
+	# Restore current post-turn map state and UI
+	hex_map.populate_from_game_state()
+	hex_map.update_move_path_highlights(TurnInput.action_plan, GameState.robot_lookup)
+	if saved_robot_id != "":
+		hex_map.set_selected_robot(saved_robot_id)
+
+	_hide_overlay()
+	replay_btn.disabled = false
+	if TurnInput.current_phase == TurnInput.Phase.INPUT:
+		submit_btn.disabled = false
 
 # ==================== Next Turn / Game End ====================
 

@@ -119,6 +119,12 @@ layout_mode = 2
 custom_minimum_size = Vector2(0, 44)
 text = "Submit Turn"
 
+[node name="ReplayBtn" type="Button" parent="UI/RightPanel/RightVBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 36)
+text = "Replay Last Turn"
+disabled = true
+
 [node name="ValidationErrors" type="Label" parent="UI/RightPanel/RightVBox"]
 layout_mode = 2
 text = ""

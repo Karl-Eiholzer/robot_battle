@@ -138,6 +138,30 @@ func remove_robot(robot_id: String) -> void:
 func get_robot_sprite(robot_id: String) -> Node2D:
 	return _robot_sprites.get(robot_id, null)
 
+# Reset map visuals to the state at the start of a turn so the replay can
+# be watched again from the beginning.  Does NOT change GameState.
+func reset_for_replay(replay_data: Dictionary) -> void:
+	# Move every sprite back to its round-0 before_position
+	var rounds = replay_data.get("rounds", [])
+	if not rounds.is_empty():
+		for robot_replay in rounds[0]:
+			var robot_id = robot_replay.get("robot_id", "")
+			var before = robot_replay.get("before_position", [0, 0])
+			var hex = Vector2i(int(before[0]), int(before[1]))
+			if robot_id in _robot_sprites:
+				_robot_sprites[robot_id].position = HexMath.axial_to_pixel(hex, HEX_SIZE)
+
+	# Undo hex-object changes so the animation recreates them correctly:
+	# remove objects that were created during the turn
+	for obj in replay_data.get("hex_objects_created", []):
+		var pos = obj.get("position", [0, 0])
+		remove_hex_object(int(pos[0]), int(pos[1]), obj.get("type", ""))
+	# restore objects that were destroyed during the turn
+	for obj in replay_data.get("hex_objects_destroyed", []):
+		_add_hex_object_node(obj)
+
+	queue_redraw()
+
 func set_selected_robot(robot_id: String) -> void:
 	if _selected_robot_id != "" and _selected_robot_id in _robot_sprites:
 		_robot_sprites[_selected_robot_id].set_selected(false)
