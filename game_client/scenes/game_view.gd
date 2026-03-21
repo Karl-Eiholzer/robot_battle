@@ -42,6 +42,7 @@ var _pan_start_camera: Vector2 = Vector2.ZERO
 func _ready() -> void:
 	# Connect signals
 	hex_map.hex_clicked.connect(_on_hex_clicked)
+	hex_map.hex_double_clicked.connect(_on_hex_double_clicked)
 	submit_btn.pressed.connect(_on_submit_pressed)
 	deploy_btn.pressed.connect(_on_deploy_pressed)
 	zoom_in_btn.pressed.connect(_on_zoom_in)
@@ -344,16 +345,17 @@ func _on_deploy_pressed() -> void:
 func _on_hex_clicked(hex: Vector2i) -> void:
 	match TurnInput.current_phase:
 		TurnInput.Phase.INPUT:
-			# Clicking on one of this player's robots selects it (higher priority than move targeting)
-			var robot_at = _find_my_robot_at_hex(hex)
-			if robot_at != "":
-				TurnInput.select_robot(robot_at)
-				return
-			# Otherwise, if a round is selected, treat the click as a move destination
 			if TurnInput.selected_robot_id != "" and _selected_round >= 0:
 				_handle_move_target(hex)
 		TurnInput.Phase.DEPLOY_TARGETING:
 			_handle_deploy_target(hex)
+
+func _on_hex_double_clicked(hex: Vector2i) -> void:
+	if TurnInput.current_phase != TurnInput.Phase.INPUT:
+		return
+	var robot_id = _find_my_robot_at_hex(hex)
+	if robot_id != "":
+		TurnInput.select_robot(robot_id)
 
 func _find_my_robot_at_hex(hex: Vector2i) -> String:
 	for robot in GameState.player_robots:

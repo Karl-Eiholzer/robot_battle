@@ -6,6 +6,7 @@ class_name HexMap
 # Manages fog of war by dimming/hiding hexes and enemies.
 
 signal hex_clicked(hex: Vector2i)
+signal hex_double_clicked(hex: Vector2i)
 
 # ==================== Constants ====================
 
@@ -299,7 +300,10 @@ func _input(event: InputEvent) -> void:
 			var local_pos = get_local_mouse_position()
 			var hex = HexMath.pixel_to_axial(local_pos, HEX_SIZE)
 			if hex in _hex_coords:
-				hex_clicked.emit(hex)
+				if event.double_click:
+					hex_double_clicked.emit(hex)
+				else:
+					hex_clicked.emit(hex)
 
 # ==================== Cleanup ====================
 
