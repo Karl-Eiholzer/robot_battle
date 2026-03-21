@@ -183,7 +183,6 @@ func get_valid_deploy_targets(robot_id: String) -> Array:
 func validate_plan() -> Array:
 	var errors: Array = []
 	for robot_id in action_plan.keys():
-		var robot = GameState.robot_lookup.get(robot_id, {})
 		var max_moves = get_max_moves(robot_id)
 		var planned_moves = count_moves_planned(robot_id)
 		if planned_moves > max_moves:

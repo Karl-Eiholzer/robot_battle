@@ -45,6 +45,18 @@ text = ""
 theme_override_font_sizes/font_size = 14
 theme_override_colors/font_color = Color(1.0, 0.8, 0.2, 1)
 
+[node name="ZoomInBtn" type="Button" parent="UI/TopBar"]
+layout_mode = 2
+custom_minimum_size = Vector2(36, 0)
+text = "+"
+tooltip_text = "Zoom In (scroll up)"
+
+[node name="ZoomOutBtn" type="Button" parent="UI/TopBar"]
+layout_mode = 2
+custom_minimum_size = Vector2(36, 0)
+text = "-"
+tooltip_text = "Zoom Out (scroll down)"
+
 [node name="RightPanel" type="PanelContainer" parent="UI"]
 layout_mode = 1
 anchors_preset = 3
@@ -133,6 +145,8 @@ text = "Waiting for other players..."
 horizontal_alignment = 1
 vertical_alignment = 1
 theme_override_font_sizes/font_size = 18
+
+[node name="Camera2D" type="Camera2D" parent="."]
 
 [node name="PollTimer" type="Timer" parent="."]
 wait_time = 3.0

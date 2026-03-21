@@ -1,210 +1,214 @@
-# Project Status - Robot Battle
+# Project Status — Robot Battle
 
-**Last Updated:** 2026-02-17
-**Current Phase:** Phase 2 - Real Game Mechanics (Implementation Complete, Needs Deployment)
-
----
-
-## Completed Phases
-
-### Phase 1: Backend Deployment ✅
-
-**All tasks complete:**
-
-- Backend fully implemented (FastAPI + Redis, 6 endpoints)
-- Deployed to Railway: https://robotbattle-production.up.railway.app
-- Redis connected and healthy (`"redis": true`)
-- Player counting bug fixed (creator was counted twice)
-- All 14 integration tests passing (`python test_api.py`)
-- Two game mechanics documents committed to git
-
-**Railway Project:**
-- Project: `marvelous-wholeness`
-- Project ID: `773c40ec-eaec-4331-873b-4972b42dbe9d`
-- Backend URL: https://robotbattle-production.up.railway.app
-- Redis: `redis.railway.internal:6379` (internal)
-- Environment variables: `REDIS_URL`, `API_SECRET` set (ENVIRONMENT still shows "development" - harmless typo in Railway dashboard)
-
-**Git:**
-- Main branch: up to date
-- Latest commit: `ed4f1e3` - Fix player counting bug
-- New docs committed: `robot_game_backend_mechanics.md`, `robot_game_client_mechanics.md`
+**Last Updated:** 2026-02-19
+**Current Phase:** Phase 3 Complete — All three phases implemented
 
 ---
 
-## Current Phase: Phase 2 - Real Game Mechanics ✅ (Locally Complete)
+## Summary
 
-### What Was Implemented
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Phase 1 | FastAPI backend + Redis + Railway deployment | ✅ Complete, deployed, tested |
+| Phase 2 | Full game mechanics (robots, roles, turns, replay) | ✅ Complete, deployed, tested |
+| Phase 3 | Godot 4.x game client | ✅ Complete (needs in-engine test) |
 
-All Phase 2 sub-phases are complete in local code. Needs deployment to Railway.
+---
+
+## Deployment
+
+- **Backend URL:** https://robotbattle-production.up.railway.app
+- **Railway Project:** `marvelous-wholeness` (ID: `773c40ec-eaec-4331-873b-4972b42dbe9d`)
+- **Redis:** `redis.railway.internal:6379` (internal to Railway network)
+- **Auto-deploy:** Pushing to `main` branch triggers immediate Railway redeploy
+- **Health check:** `GET /health` returns `{"status":"healthy","redis":true}`
+
+**Environment variables set in Railway:**
+- `REDIS_URL` — set
+- `API_SECRET` — set
+- `ENVIRONMENT` — shows "development" (harmless typo in Railway dashboard; does not affect behavior)
+
+---
+
+## Git
+
+- **Branch:** `main`
+- **Latest commits:**
+  ```
+  cf0655a  Update api_architecture.md to match Phase 2 implementation
+  61b2158  Update godot_architecture.md to match Phase 3 implementation
+  e3847c3  Implement Phase 3: Godot 4.x game client
+  aea6fe5  Fix test helper: use 'is not None' check for HTTP error responses
+  807707b  Implement Phase 2: Full robot battle game mechanics
+  ed4f1e3  Fix player counting bug in game creation
+  ```
+
+---
+
+## Phase 1: Backend ✅
+
+FastAPI + Redis backend with 9 API endpoints, deployed to Railway.
+
+**Endpoints:**
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/health` | Redis health check |
+| POST | `/game/create` | Create game, get `game_id` + `api_key` |
+| POST | `/game/{id}/join` | Join game, get `player_id` |
+| GET | `/game/{id}/status` | Poll game state |
+| POST | `/game/{id}/team/{t}/assign_roles` | Assign player→role for a team |
+| POST | `/game/{id}/spawn_robots` | Spawn robots from assigned roles |
+| GET | `/game/{id}/initial_state` | Get map + starting robot positions |
+| POST | `/game/{id}/submit` | Submit 6-round action plan |
+| GET | `/game/{id}/results` | Poll for turn replay data |
+
+**Backend files:** `backend/main.py`, `backend/models.py`, `backend/redis_client.py`, `backend/game_logic.py`, `backend/auth.py`, `backend/config.py`
+
+---
+
+## Phase 2: Game Mechanics ✅
+
+Full game logic engine. All Phase 2 success criteria met and deployed.
 
 **Implemented:**
-- 4 robot types with correct stats (Captain, Scout, Defender, Engineer)
-- 3 player roles for 2-player teams (Captain, Huntsman) and 3-player teams (Captain, Huntsman, Engineer)
-- 6-round turn processing engine with all 12 collision cases
-- All 4 deploy actions (EMP, Firewall, Supply Drop, Extra Moves)
-- Stun mechanics, Captain capture win condition
-- Replay generation with animation types per round
-- Sight range filtering (fog of war)
+- 4 robot types: Captain (str 7, 3 moves), Scout (str 3, 4 moves), Defender (str 5, 2 moves), Engineer (str 0, 6 moves)
+- Role system: 2-person teams (Captain+Huntsman), 3-person teams (Captain+Huntsman+Engineer)
+- Robot counts per role (e.g. Captain role = 1 Captain + 2 Defenders + 2 Engineers for 2-person teams)
+- 6-round simultaneous turn processing with initiative ordering
+- 12 collision cases (stun, push, capture, destroy firewall, etc.)
+- 4 deploy action types: EMP (stun area), Firewall (zone denial), Supply Drop (energy), Extra Moves (self buff)
+- Captain capture win condition
+- Fog of war: sight range filtering per robot type
 - Realistic map generation with obstacles and spawn zones
-- New endpoints: assign_roles, spawn_robots, initial_state
-- Comprehensive integration tests in `test_full_game.py`
-- Backward compatibility with old test_api.py format
+- Full `TurnReplay` replay data with per-robot `animation_type` per round
+- Backward compatibility: old `moves: List[MoveAction]` format still accepted
 
-### What Was Previously Missing
+**Robot type stats:**
 
-~~The deployed backend has **stub implementations** only:~~
-~~- No robot types — generic "soldier" units~~
-~~- No real turn processing — moves accepted but nothing actually happens~~
-~~- No win condition — games never end~~
-~~- No deploy actions — no EMP, Firewall, Supply Drop~~
-~~- No player roles — no Captain, Huntsman, or Engineer roles~~
-~~- No replay data — turn results are bare-bones~~
-
-### Phase 2 Implementation Plan (6 Sub-phases)
-
-#### Phase 2a: Core Data Models *(Simple, ~400-500 lines)*
-**File:** `backend/models.py`
-- Add `RobotTypeStats` model + `ROBOT_TYPE_STATS` constant for all 4 robot types:
-  - **Captain:** 3 moves, max 2 energy, EMP deploy, strength 7, team_order 1
-  - **Scout:** 4 moves, max 6 energy, Extra Moves deploy, strength 3, team_order 3
-  - **Defender:** 2 moves, max 3 energy, Firewall deploy, strength 5, team_order 3
-  - **Engineer:** 6 moves, max 3 energy, Supply Drop deploy, strength 0, team_order 0
-- Add `GameVariables` model (team_size, map_size, input_time, review_time, starting_energy)
-- Add `PlayerRole` model defining robot counts per role:
-  - 2-player teams: Captain (1 Captain + 2 Defender + 2 Engineer), Huntsman (4 Scout + 1 Engineer)
-  - 3-player teams: Captain (1 Captain + 3 Defender), Huntsman (5 Scout), Engineer (5 Engineer)
-- Add `Robot` model for runtime state (position, energy, state, spawn_position)
-- Add `RoundAction` and `DeployAction` models for turn submission
-- Add `HexObject` model (EMP/Firewall/SupplyDrop/Obstacle)
-- Add `RobotRoundReplay` and `TurnReplay` models for animation data
-- Add `AssignRolesRequest` model
-- Update `CreateGameRequest` to include `game_variables`
-- Update `SubmitMoveRequest` to accept `List[RoundAction]`
-
-#### Phase 2b: Redis Extensions *(Medium, ~300-400 lines)*
-**File:** `backend/redis_client.py`
-- Add 5 new Redis key namespaces:
-  - `game:{id}:robots` — all Robot objects
-  - `game:{id}:team:{team}:roles` — player_id → role_name
-  - `game:{id}:hex_objects` — EMP/Firewall/SupplyDrop/Obstacle list
-  - `game:{id}:turn:{turn}:replay` — TurnReplay object
-  - `game:{id}:variables` — GameVariables object
-- Add 20+ new methods: store/get robots, roles, hex objects, replay, variables
-
-#### Phase 2c: Role Assignment & Robot Spawning API *(Medium, ~300-400 lines)*
-**Files:** `backend/main.py`, `backend/game_logic.py`
-- **New endpoint:** `POST /game/{game_id}/team/{team}/assign_roles`
-- **New endpoint:** `POST /game/{game_id}/spawn_robots`
-- **New endpoint:** `GET /game/{game_id}/initial_state` (customized per player)
-- Add `spawn_robots_for_game()` — creates Robot objects from role assignments
-- Add `calculate_spawn_positions()` — team 0 left/bottom, team 1 right/top
-- Add `validate_role_assignment()` — checks role combinations are legal
-
-#### Phase 2d: Core Turn Processing Engine *(Complex, ~800-1000 lines)*
-**File:** `backend/game_logic.py` — major rewrite of stubs
-- `establish_robot_order()` — initiative team first, then team_order, then random tiebreak
-- `process_round()` — loop all robots in order for each of 6 rounds
-- `process_robot_action()` — 12 collision cases from mechanics doc:
-  1. Robot stunned → skip (animation: "Stunned")
-  2. Wait + Firewall → destroy firewall, send to spawn, stun
-  3. Wait + EMP → stun in place
-  4. Wait (normal) → process deploy (animation: "Waiting")
-  5. Move to empty → move, process deploy (animation: "Move")
-  6. Move to enemy Captain → WIN (animation: "Bump")
-  7. Move to same-team robot → fail (animation: "Bump")
-  8. Move to weaker enemy → push, move (animation: "Power Move")
-  9. Move to stronger enemy → fail (animation: "Bump")
-  10. Move to obstacle → error (animation: "Bump")
-  11. Move to supply drop → gain energy, move (animation: "Move")
-  12. Else → error (animation: "Puzzled")
-- `process_deploy_action()` — EMP/Firewall/SupplyDrop/ExtraMoves
-- `check_win_condition()` — Captain capture detection
-
-#### Phase 2e: Enhanced Submit & Results Endpoints *(Medium, ~200-300 lines)*
-**File:** `backend/main.py`
-- Update `POST /game/{game_id}/submit` — validate actions (robot ownership, move counts, energy), accept new `RoundAction` format
-- Update `GET /game/{game_id}/results` — return `TurnReplay`, filtered robot list (sight range), hex objects, winner
-- Add `validate_player_actions()` function
-- Add `filter_robots_by_sight()` function (fog of war)
-
-#### Phase 2f: Map Generation & Comprehensive Tests *(Medium, ~300-400 lines)*
-**Files:** `backend/game_logic.py`, `test_api.py`
-- Replace stub `generate_default_map()` with realistic generator:
-  - Use GameVariables.map_size (small 30x20, medium 40x40, large 60x40)
-  - Place obstacles avoiding spawn zones
-  - Strategic terrain layout
-- Add comprehensive integration tests:
-  - Full 2v2 game flow (create → roles → spawn → turns → Captain capture)
-  - Full 3v3 game flow
-  - Deploy action tests (EMP, Firewall, Supply Drop, Extra Moves)
-  - Collision/stun tests
-  - Fog of war test
+| Type | Strength | Moves | Max Energy | Deploy | Sight |
+|------|----------|-------|------------|--------|-------|
+| Captain | 7 | 3 | 2 | EMP | 5 |
+| Scout | 3 | 4 | 6 | Extra Moves | 6 |
+| Defender | 5 | 2 | 3 | Firewall | 4 |
+| Engineer | 0 | 6 | 3 | Supply Drop | 3 |
 
 ---
 
-## Files to Modify in Phase 2
+## Phase 3: Godot 4.x Client ✅ (code written, not yet run in engine)
 
-| File | Phases | Changes |
-|------|--------|---------|
-| `backend/models.py` | 2a | Add 15+ new Pydantic models |
-| `backend/redis_client.py` | 2b | Add 20+ new Redis methods |
-| `backend/game_logic.py` | 2c, 2d, 2f | Replace stubs with real game logic |
-| `backend/main.py` | 2c, 2e | Add 3 new endpoints, enhance existing |
-| `test_api.py` | 2f | Add comprehensive integration tests |
+Complete Godot 4.x game client in `game_client/`. Functional prototype — colored shapes, no art assets.
+
+**Files:**
+```
+game_client/
+├── project.godot               # 4 autoloads, 1280×720, Compatibility renderer
+├── icon.svg
+├── scripts/
+│   ├── hex_math.gd             # Autoload: flat-top axial math (HEX_SIZE=48)
+│   ├── api_client.gd           # Autoload: all HTTP; signal-based async
+│   ├── game_state.gd           # Autoload: single source of truth for all game data
+│   └── turn_input.gd           # Autoload: 6-round action planning state machine
+├── scripts/ (also)
+│   ├── hex_map.gd              # Node2D: renders hex grid, fog of war, click input
+│   └── robot_sprite.gd         # Node2D: per-robot visual + tween animations
+└── scenes/
+    ├── main_menu.tscn/.gd      # Enter name, create/join game, wait for players
+    ├── role_assignment.tscn/.gd # Each player picks their own role; any player spawns
+    ├── game_view.tscn/.gd      # Main gameplay: input phase + replay playback
+    └── game_end.tscn/.gd       # Win screen, return to menu
+```
+
+**Autoloads registered in project.godot:**
+```
+HexMath    → res://scripts/hex_math.gd
+APIClient  → res://scripts/api_client.gd
+GameState  → res://scripts/game_state.gd
+TurnInput  → res://scripts/turn_input.gd
+```
+
+**Game client flow:**
+1. `MainMenu` — player enters name, creates or joins a game; polls `/status` until full → `RoleAssignment`
+2. `RoleAssignment` — each player selects their own role; polls `/initial_state` until robots exist → `GameView`
+3. `GameView` — alternates input phase (action planning) and review phase (replay animation) until winner
+4. `GameEnd` — shows winner, return to menu
+
+**Visual design (prototype):**
+- Team 0 = blue shades, Team 1 = red shades
+- Captain = large circle, Scout = small circle, Defender = square, Engineer = diamond
+- Terrain: plains (green), forest (dark green), mountain (brown), water (blue), spawn (tan)
+- Hex objects: EMP (purple ⚡), Firewall (orange 🔥), Supply Drop (green 📦)
+- Fog of war: hexes outside player robot sight range are dimmed
+
+**Known status:** GDScript code written and committed. Has not yet been opened and tested in the Godot editor. Likely needs minor fixes when first run (node path issues, type errors, etc.).
 
 ---
 
-## Success Criteria for Phase 2
+## Testing
 
-- [x] All 4 robot types with correct stats
-- [x] Role assignment for 2-player and 3-player teams
-- [x] 6-round turn processing with all 12 collision cases
-- [x] All 4 deploy actions functional
-- [x] Stun mechanics (Firewall + EMP)
-- [x] Replay data with animation types per round
-- [x] Captain capture win condition
-- [x] Sight range filtering (fog of war)
-- [x] Realistic map generation with obstacles
-- [x] Full 2v2 and 3v3 integration tests in `test_full_game.py`
-- [x] Old `test_api.py` backward compatibility maintained
-- [ ] Deploy to Railway and run integration tests against production
+| Script | Coverage | How to Run |
+|--------|----------|------------|
+| `test_api.py` | Phase 1 flow (14 checks) | `python test_api.py [URL]` |
+| `test_full_game.py` | Phase 2 mechanics (6 suites, ~30 checks) | `python test_full_game.py [URL]` |
+
+Default URL is `http://localhost:8000`. Pass the Railway URL to test production.
+
+Last verified: both scripts **all passing** against deployed Railway backend.
+
+See `TEST_GUIDE.md` for full test documentation.
 
 ---
 
-## Backward Compatibility Strategy
+## Documentation
 
-Old `test_api.py` sends generic `MoveAction` format. New code will:
-- Accept both old `moves: List[MoveAction]` and new `actions: List[RoundAction]` formats
-- Convert old format to new internally
-- Keep old test passing through all phases
-- Add new `test_full_game.py` for comprehensive testing
+| File | Contents |
+|------|----------|
+| `CLAUDE.md` | Project overview for Claude Code |
+| `api_architecture.md` | Backend: all endpoints, Redis keys, data models, auth, turn processing |
+| `godot_architecture.md` | Client: all scripts, scene flow, action format, replay, persistence |
+| `robot_game_backend_mechanics.md` | Game rules: 12 collision cases, turn order, deploy actions |
+| `robot_game_client_mechanics.md` | Game rules: robot types, roles, deploy action details |
+| `TEST_GUIDE.md` | Test descriptions, how to run, how to read output |
 
 ---
 
 ## Project Structure
 
 ```
-/Users/family/Projects/Git/robot_battle/
+robot_battle/
 ├── STATUS.md                         # This file
-├── CLAUDE.md                         # Project overview for Claude Code
-├── README.md                         # Project README
-├── api_architecture.md               # Original backend architecture design
-├── godot_architecture.md             # Game client architecture (future)
-├── robot_game_backend_mechanics.md   # Game rules - turn processing ← KEY REFERENCE
-├── robot_game_client_mechanics.md    # Game rules - client gameplay ← KEY REFERENCE
-├── test_api.py                       # Integration tests (Phase 1 passing)
-├── backend/                          # FastAPI application
-│   ├── main.py                       # API endpoints (6 working)
-│   ├── models.py                     # Pydantic models (8 basic, expanding in 2a)
-│   ├── redis_client.py               # Redis data access (expanding in 2b)
-│   ├── auth.py                       # API key authentication
-│   ├── game_logic.py                 # Game processing (stub, rewriting in 2d)
-│   ├── config.py                     # Configuration
+├── CLAUDE.md                         # Project overview
+├── TEST_GUIDE.md                     # Test documentation
+├── api_architecture.md               # Backend architecture (accurate, updated 2026-02-19)
+├── godot_architecture.md             # Client architecture (accurate, updated 2026-02-19)
+├── robot_game_backend_mechanics.md   # Game rules reference
+├── robot_game_client_mechanics.md    # Client gameplay reference
+├── test_api.py                       # Phase 1 integration tests
+├── test_full_game.py                 # Phase 2 integration tests
+├── backend/                          # FastAPI application (deployed to Railway)
+│   ├── main.py
+│   ├── models.py
+│   ├── redis_client.py
+│   ├── game_logic.py
+│   ├── auth.py
+│   ├── config.py
 │   ├── requirements.txt
-│   ├── Procfile                      # Railway: uvicorn main:app
-│   └── runtime.txt                   # Python 3.11.7
-└── game_client/                      # Empty (Phase 3: Godot client)
+│   ├── Procfile
+│   └── runtime.txt
+└── game_client/                      # Godot 4.x game client (Phase 3)
+    ├── project.godot
+    ├── icon.svg
+    ├── scripts/
+    │   ├── hex_math.gd
+    │   ├── api_client.gd
+    │   ├── game_state.gd
+    │   ├── turn_input.gd
+    │   ├── hex_map.gd
+    │   └── robot_sprite.gd
+    └── scenes/
+        ├── main_menu.tscn + main_menu.gd
+        ├── role_assignment.tscn + role_assignment.gd
+        ├── game_view.tscn + game_view.gd
+        └── game_end.tscn + game_end.gd
 ```
 
 ---
@@ -212,44 +216,25 @@ Old `test_api.py` sends generic `MoveAction` format. New code will:
 ## Quick Reference
 
 ```bash
-# Test current deployed API
+# Run integration tests against production
 python test_api.py https://robotbattle-production.up.railway.app
+python test_full_game.py https://robotbattle-production.up.railway.app
 
-# Check health
+# Check API health
 curl https://robotbattle-production.up.railway.app/health
 
-# Railway operations (must be in project directory)
-railway link          # Link CLI to Railway project
-railway logs          # View deployment logs
-railway status        # Check service status
+# View Railway deployment logs
+railway logs
 
-# Git operations
-git checkout main
-git checkout test1
-git push origin main  # Triggers Railway auto-deploy
+# Deploy: just push to main
+git push origin main
 ```
 
 ---
 
-## Railway Setup Checklist
+## Next Steps
 
-- [x] Redis service running
-- [x] Backend service deployed and reachable
-- [x] Backend service linked to GitHub repo `robot_battle`
-- [x] Backend service root directory: `/backend`
-- [x] `REDIS_URL` environment variable set
-- [x] `API_SECRET` environment variable set
-- [ ] `ENVIRONMENT` set to `production` (currently shows "development" — typo in Railway dashboard)
-- [x] Health endpoint returns `{"status":"healthy","redis":true}`
-
----
-
-## Phase 3 Preview: Godot Client
-
-After Phase 2 is complete:
-- Build Godot 4.x game client following `godot_architecture.md`
-- Implement APIClient autoload singleton
-- Build UI: main menu, lobby, game view
-- Implement hex map rendering
-- Add turn submission and polling logic
-- Test full multiplayer game
+1. **Open `game_client/` in Godot 4.x editor** — first run will surface any GDScript errors
+2. **Fix any editor errors** — likely minor: node path mismatches, type annotation issues
+3. **End-to-end test** — run two Godot instances on the same machine against the Railway backend
+4. **Multi-device test** — test on separate machines to validate multiplayer flow

@@ -21,6 +21,9 @@ extends Node2D
 @onready var status_overlay_label: Label = $UI/StatusOverlay/StatusOverlayLabel
 @onready var poll_timer: Timer = $PollTimer
 @onready var input_timer: Timer = $InputTimer
+@onready var camera: Camera2D = $Camera2D
+@onready var zoom_in_btn: Button = $UI/TopBar/ZoomInBtn
+@onready var zoom_out_btn: Button = $UI/TopBar/ZoomOutBtn
 
 # ==================== State ====================
 
@@ -29,6 +32,11 @@ var _round_buttons: Array = []  # Array of Button nodes for the 6 round slots
 var _robot_buttons: Dictionary = {}  # robot_id -> Button
 var _input_time_remaining: float = 0.0
 
+# Camera pan state
+var _is_panning: bool = false
+var _pan_start_mouse: Vector2 = Vector2.ZERO
+var _pan_start_camera: Vector2 = Vector2.ZERO
+
 # ==================== Ready ====================
 
 func _ready() -> void:
@@ -36,6 +44,8 @@ func _ready() -> void:
 	hex_map.hex_clicked.connect(_on_hex_clicked)
 	submit_btn.pressed.connect(_on_submit_pressed)
 	deploy_btn.pressed.connect(_on_deploy_pressed)
+	zoom_in_btn.pressed.connect(_on_zoom_in)
+	zoom_out_btn.pressed.connect(_on_zoom_out)
 	poll_timer.timeout.connect(_on_poll_timer)
 	input_timer.timeout.connect(_on_input_timer_expired)
 
@@ -51,6 +61,7 @@ func _ready() -> void:
 
 	# Initialize map and UI
 	hex_map.populate_from_game_state()
+	camera.position = hex_map.get_player_robots_centroid()
 	_rebuild_robot_list()
 	_update_header()
 
@@ -64,11 +75,38 @@ func _ready() -> void:
 		input_timer.wait_time = float(input_time)
 		input_timer.start()
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if input_timer.time_left > 0:
 		timer_label.text = "Time: %ds" % int(input_timer.time_left)
 	else:
 		timer_label.text = ""
+
+# ==================== Camera Pan / Zoom ====================
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var btn = event.button_index
+		if btn == MOUSE_BUTTON_MIDDLE or btn == MOUSE_BUTTON_RIGHT:
+			_is_panning = event.pressed
+			if event.pressed:
+				_pan_start_mouse = event.position
+				_pan_start_camera = camera.position
+		elif event.pressed and btn == MOUSE_BUTTON_WHEEL_UP:
+			_apply_zoom(1.15)
+		elif event.pressed and btn == MOUSE_BUTTON_WHEEL_DOWN:
+			_apply_zoom(1.0 / 1.15)
+	elif event is InputEventMouseMotion and _is_panning:
+		var delta_screen = event.position - _pan_start_mouse
+		camera.position = _pan_start_camera - delta_screen / camera.zoom.x
+
+func _on_zoom_in() -> void:
+	_apply_zoom(1.25)
+
+func _on_zoom_out() -> void:
+	_apply_zoom(1.0 / 1.25)
+
+func _apply_zoom(factor: float) -> void:
+	camera.zoom = (camera.zoom * factor).clamp(Vector2(0.2, 0.2), Vector2(5.0, 5.0))
 
 # ==================== Header ====================
 
@@ -86,9 +124,11 @@ func _rebuild_robot_list() -> void:
 	_robot_buttons.clear()
 
 	for robot in GameState.player_robots:
+		if robot.get("player_id", "") != GameState.player_id:
+			continue  # Skip robots belonging to teammates
 		var robot_id = robot.get("robot_id", "")
 		var robot_type = robot.get("type", "?")
-		var team = robot.get("team", 0)
+		var _team = robot.get("team", 0)
 		var energy = robot.get("energy", 0)
 		var state_str = robot.get("state", "active")
 
@@ -113,9 +153,18 @@ func _on_robot_button_pressed(robot_id: String) -> void:
 	TurnInput.select_robot(robot_id)
 
 func _on_robot_selected(robot_id: String) -> void:
-	# Highlight selected button
+	# Highlight selected button in right panel
 	for rid in _robot_buttons.keys():
 		_robot_buttons[rid].button_pressed = (rid == robot_id)
+
+	# Highlight robot sprite on map
+	hex_map.set_selected_robot(robot_id)
+
+	# Pan camera to center on the selected robot
+	var robot = GameState.robot_lookup.get(robot_id, {})
+	if not robot.is_empty():
+		var pos = robot.get("position", [0, 0])
+		camera.position = HexMath.axial_to_pixel(Vector2i(int(pos[0]), int(pos[1])), HexMath.HEX_SIZE)
 
 	_update_robot_stats(robot_id)
 	_rebuild_action_slots(robot_id)
@@ -178,14 +227,14 @@ func _rebuild_action_slots(robot_id: String) -> void:
 		var after = round_data.get("after_position", [0, 0])
 		pos_lbl.text = "(%d,%d)" % [after[0], after[1]]
 		pos_lbl.custom_minimum_size = Vector2(64, 0)
-		pos_lbl.theme_override_font_sizes.font_size = 11
+		pos_lbl.add_theme_font_size_override("font_size", 11)
 		hbox.add_child(pos_lbl)
 
 		var deploy_indicator = Label.new()
 		var deploy = round_data.get("deploy", null)
 		deploy_indicator.text = "[D]" if deploy != null else ""
-		deploy_indicator.theme_override_colors.font_color = Color(0.8, 0.4, 1.0)
-		deploy_indicator.theme_override_font_sizes.font_size = 11
+		deploy_indicator.add_theme_color_override("font_color", Color(0.8, 0.4, 1.0))
+		deploy_indicator.add_theme_font_size_override("font_size", 11)
 		hbox.add_child(deploy_indicator)
 
 		# Select round button (for deploy targeting)
@@ -387,7 +436,7 @@ func _on_results_received(data: Dictionary) -> void:
 		else:
 			_start_next_turn()
 
-func _on_request_failed(endpoint: String, status_code: int, body: String) -> void:
+func _on_request_failed(endpoint: String, _status_code: int, body: String) -> void:
 	if endpoint.contains("submit"):
 		TurnInput.set_phase(TurnInput.Phase.INPUT)
 		submit_btn.disabled = false
@@ -440,6 +489,8 @@ func _play_replay(replay: Dictionary, full_results: Dictionary) -> void:
 
 func _start_next_turn() -> void:
 	hex_map.populate_from_game_state()
+	hex_map.set_selected_robot("")
+	camera.position = hex_map.get_player_robots_centroid()
 	_rebuild_robot_list()
 	_update_header()
 	TurnInput.start_input_phase()

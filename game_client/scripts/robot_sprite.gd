@@ -12,6 +12,7 @@ var robot_type: String = "captain"
 var axial_pos: Vector2i = Vector2i.ZERO
 var is_stunned: bool = false
 var is_player_robot: bool = false
+var is_selected: bool = false
 
 # ==================== Colors ====================
 
@@ -93,6 +94,10 @@ func _draw() -> void:
 		draw_string(font, Vector2(-text_size.x / 2, text_size.y / 2 - 2), label,
 				HORIZONTAL_ALIGNMENT_CENTER, -1, 14, Color.WHITE)
 
+	# Selection highlight: bright yellow ring drawn outside the shape
+	if is_selected:
+		draw_arc(Vector2.ZERO, SHAPE_SIZE + 7.0, 0, TAU, 36, Color(1.0, 0.9, 0.1, 1.0), 3.5)
+
 	# Stunned indicator: red X
 	if is_stunned:
 		var s = SHAPE_SIZE * 0.6
@@ -130,4 +135,8 @@ func clear_stunned() -> void:
 
 func set_stunned(stunned: bool) -> void:
 	is_stunned = stunned
+	queue_redraw()
+
+func set_selected(selected: bool) -> void:
+	is_selected = selected
 	queue_redraw()

@@ -11,9 +11,9 @@ func _ready() -> void:
 
 	winner_label.text = "Team %d Wins!" % winner_team
 	if is_my_team_winner:
-		winner_label.theme_override_colors.font_color = Color(0.2, 1.0, 0.2, 1)
+		winner_label.add_theme_color_override("font_color", Color(0.2, 1.0, 0.2, 1))
 	else:
-		winner_label.theme_override_colors.font_color = Color(1.0, 0.2, 0.2, 1)
+		winner_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2, 1))
 
 	turn_label.text = "Completed in %d turn(s)" % GameState.current_turn
 

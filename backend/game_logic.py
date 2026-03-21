@@ -637,15 +637,17 @@ def get_spawn_positions(map_size: str, team_size: int) -> Dict[int, List[List[in
         robots_per_team += (role.captain_count + role.scout_count +
                             role.defender_count + role.engineer_count)
 
-    # Generate spawn positions: team 0 on left (q=1), team 1 on right (q=width-2)
+    # Generate spawn positions: team 0 on left (q=1), team 1 on right (q=width-2).
+    # Robots are clustered tightly (spacing=2) around the vertical center.
     team0_spawns = []
     team1_spawns = []
 
     center_r = height // 2
-    spacing = max(1, height // (robots_per_team + 1))
+    spacing = 2  # Fixed tight spacing — robots cluster within ~2*N rows of center
+    half_span = (robots_per_team - 1) * spacing // 2
 
     for i in range(robots_per_team):
-        r = center_r - (robots_per_team // 2) * spacing + i * spacing
+        r = center_r - half_span + i * spacing
         r = max(1, min(height - 2, r))
         team0_spawns.append([1, r])
         team1_spawns.append([width - 2, r])

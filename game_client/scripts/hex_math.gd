@@ -1,8 +1,9 @@
 extends Node
 
-# Pure static hex math functions using axial coordinates (q, r).
+# Hex math utility functions using axial coordinates (q, r).
 # Flat-top hexagon layout (matches backend map generation).
 # HEX_SIZE is the radius from center to corner.
+# Autoloaded as HexMath singleton — call as HexMath.func_name()
 
 const HEX_SIZE: float = 48.0
 
@@ -13,31 +14,31 @@ const AXIAL_DIRECTIONS: Array = [
 ]
 
 # Distance between two axial coordinates
-static func axial_distance(a: Vector2i, b: Vector2i) -> int:
+func axial_distance(a: Vector2i, b: Vector2i) -> int:
 	var diff = a - b
 	return (abs(diff.x) + abs(diff.x + diff.y) + abs(diff.y)) / 2
 
 # Get the 6 neighbors of an axial hex
-static func axial_neighbors(hex: Vector2i) -> Array:
+func axial_neighbors(hex: Vector2i) -> Array:
 	var result: Array = []
 	for d in AXIAL_DIRECTIONS:
 		result.append(hex + d)
 	return result
 
 # Convert axial coordinates to pixel position (flat-top hexagons)
-static func axial_to_pixel(hex: Vector2i, hex_size: float = HEX_SIZE) -> Vector2:
+func axial_to_pixel(hex: Vector2i, hex_size: float = HEX_SIZE) -> Vector2:
 	var x = hex_size * (3.0 / 2.0 * hex.x)
 	var y = hex_size * (sqrt(3.0) / 2.0 * hex.x + sqrt(3.0) * hex.y)
 	return Vector2(x, y)
 
 # Convert pixel position to axial coordinates (flat-top hexagons)
-static func pixel_to_axial(pixel: Vector2, hex_size: float = HEX_SIZE) -> Vector2i:
+func pixel_to_axial(pixel: Vector2, hex_size: float = HEX_SIZE) -> Vector2i:
 	var q = (2.0 / 3.0 * pixel.x) / hex_size
 	var r = (-1.0 / 3.0 * pixel.x + sqrt(3.0) / 3.0 * pixel.y) / hex_size
 	return axial_round(Vector2(q, r))
 
 # Round fractional axial coordinates to nearest hex
-static func axial_round(frac: Vector2) -> Vector2i:
+func axial_round(frac: Vector2) -> Vector2i:
 	var s = -frac.x - frac.y
 	var rx = round(frac.x)
 	var ry = round(frac.y)
@@ -52,7 +53,7 @@ static func axial_round(frac: Vector2) -> Vector2i:
 	return Vector2i(int(rx), int(ry))
 
 # Get all hexes within radius of center (inclusive)
-static func hexes_in_radius(center: Vector2i, radius: int) -> Array:
+func hexes_in_radius(center: Vector2i, radius: int) -> Array:
 	var result: Array = []
 	for q in range(-radius, radius + 1):
 		for r in range(max(-radius, -q - radius), min(radius, -q + radius) + 1):
@@ -60,7 +61,7 @@ static func hexes_in_radius(center: Vector2i, radius: int) -> Array:
 	return result
 
 # Get all hexes on a line from a to b (inclusive)
-static func hex_line(a: Vector2i, b: Vector2i) -> Array:
+func hex_line(a: Vector2i, b: Vector2i) -> Array:
 	var dist = axial_distance(a, b)
 	if dist == 0:
 		return [a]
@@ -73,7 +74,7 @@ static func hex_line(a: Vector2i, b: Vector2i) -> Array:
 	return result
 
 # Get ring of hexes at exactly radius distance from center
-static func hex_ring(center: Vector2i, radius: int) -> Array:
+func hex_ring(center: Vector2i, radius: int) -> Array:
 	if radius == 0:
 		return [center]
 	var result: Array = []

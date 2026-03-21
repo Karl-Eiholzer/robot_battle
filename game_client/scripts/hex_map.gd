@@ -40,11 +40,11 @@ var _highlight_hexes: Dictionary = {}
 # Robot sprite nodes: robot_id -> RobotSprite node
 var _robot_sprites: Dictionary = {}
 
+# Currently selected robot id (for highlight)
+var _selected_robot_id: String = ""
+
 # Hex object indicators: position key String "q,r" -> Label/node
 var _hex_object_nodes: Dictionary = {}
-
-# Camera offset (pan support)
-var _map_offset: Vector2 = Vector2.ZERO
 
 # ==================== Init ====================
 
@@ -71,19 +71,15 @@ func _build_hex_grid() -> void:
 		_hex_coords[coord] = true
 		_hex_terrain[coord] = hex_data.get("terrain", "default")
 
-	# Center map on screen
-	_recalculate_offset()
-
-func _recalculate_offset() -> void:
-	if _hex_coords.is_empty():
-		return
-	var sum_pixel = Vector2.ZERO
-	for coord in _hex_coords.keys():
-		sum_pixel += HexMath.axial_to_pixel(coord, HEX_SIZE)
-	var avg = sum_pixel / float(_hex_coords.size())
-	# Center in viewport
-	var viewport_size = get_viewport_rect().size
-	_map_offset = viewport_size / 2.0 - avg
+# Returns the average world position of the player's robots (for camera centering).
+func get_player_robots_centroid() -> Vector2:
+	if GameState.player_robots.is_empty():
+		return Vector2.ZERO
+	var sum := Vector2.ZERO
+	for robot in GameState.player_robots:
+		var pos = robot.get("position", [0, 0])
+		sum += HexMath.axial_to_pixel(Vector2i(int(pos[0]), int(pos[1])), HEX_SIZE)
+	return sum / float(GameState.player_robots.size())
 
 func _rebuild_visible_hexes() -> void:
 	_visible_hexes.clear()
@@ -107,12 +103,12 @@ func _add_or_update_robot(robot: Dictionary, is_mine: bool) -> void:
 	var robot_id = robot.get("robot_id", "")
 	var pos = robot.get("position", [0, 0])
 	var hex = Vector2i(int(pos[0]), int(pos[1]))
-	var pixel = HexMath.axial_to_pixel(hex, HEX_SIZE) + _map_offset
+	var pixel = HexMath.axial_to_pixel(hex, HEX_SIZE)
 
 	if robot_id in _robot_sprites:
-		var sprite = _robot_sprites[robot_id]
-		sprite.position = pixel
-		sprite.set_stunned(robot.get("state", "active") == "stunned")
+		var existing := _robot_sprites[robot_id] as RobotSprite
+		existing.position = pixel
+		existing.set_stunned(robot.get("state", "active") == "stunned")
 		return
 
 	var sprite := RobotSprite.new()
@@ -129,7 +125,7 @@ func update_robot_position(robot_id: String, hex: Vector2i) -> void:
 	if robot_id in _robot_sprites:
 		var sprite = _robot_sprites[robot_id]
 		sprite.axial_pos = hex
-		sprite.position = HexMath.axial_to_pixel(hex, HEX_SIZE) + _map_offset
+		sprite.position = HexMath.axial_to_pixel(hex, HEX_SIZE)
 
 func remove_robot(robot_id: String) -> void:
 	if robot_id in _robot_sprites:
@@ -138,6 +134,13 @@ func remove_robot(robot_id: String) -> void:
 
 func get_robot_sprite(robot_id: String) -> Node2D:
 	return _robot_sprites.get(robot_id, null)
+
+func set_selected_robot(robot_id: String) -> void:
+	if _selected_robot_id != "" and _selected_robot_id in _robot_sprites:
+		_robot_sprites[_selected_robot_id].set_selected(false)
+	_selected_robot_id = robot_id
+	if robot_id != "" and robot_id in _robot_sprites:
+		_robot_sprites[robot_id].set_selected(true)
 
 # ==================== Hex Object Management ====================
 
@@ -163,7 +166,7 @@ func _add_hex_object_node(obj: Dictionary) -> void:
 		return  # Already rendered
 
 	var hex = Vector2i(int(pos[0]), int(pos[1]))
-	var pixel = HexMath.axial_to_pixel(hex, HEX_SIZE) + _map_offset
+	var pixel = HexMath.axial_to_pixel(hex, HEX_SIZE)
 
 	# Simple label indicator
 	var label = Label.new()
@@ -217,19 +220,19 @@ func _draw() -> void:
 	for obj in GameState.hex_objects:
 		var pos = obj.get("position", [0, 0])
 		var hex = Vector2i(int(pos[0]), int(pos[1]))
-		var pixel = HexMath.axial_to_pixel(hex, HEX_SIZE) + _map_offset
+		var pixel = HexMath.axial_to_pixel(hex, HEX_SIZE)
 		var color = HEX_OBJECT_COLORS.get(obj.get("type", ""), Color.MAGENTA)
 		color.a = 0.35
 		draw_circle(pixel, HEX_SIZE * 0.4, color)
 
 func _draw_hex(coord: Vector2i) -> void:
-	var center = HexMath.axial_to_pixel(coord, HEX_SIZE) + _map_offset
+	var center = HexMath.axial_to_pixel(coord, HEX_SIZE)
 	var terrain = _hex_terrain.get(coord, "default")
 	var color = TERRAIN_COLORS.get(terrain, TERRAIN_COLORS["default"])
 
 	# Fog of war: dim hexes not visible
-	var visible = _is_visible(coord)
-	if not visible:
+	var is_hex_visible = _is_visible(coord)
+	if not is_hex_visible:
 		color = color.darkened(0.55)
 		color.a = 0.6
 
@@ -243,7 +246,7 @@ func _draw_hex(coord: Vector2i) -> void:
 		draw_colored_polygon(points, hcolor)
 
 	# Hex border
-	var border_color = Color(0, 0, 0, 0.25) if visible else Color(0, 0, 0, 0.1)
+	var border_color = Color(0, 0, 0, 0.25) if is_hex_visible else Color(0, 0, 0, 0.1)
 	draw_polyline(_close_polygon(points), border_color, 1.0)
 
 func _hex_corners(center: Vector2) -> PackedVector2Array:
@@ -265,7 +268,7 @@ func _close_polygon(points: PackedVector2Array) -> PackedVector2Array:
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			var local_pos = get_local_mouse_position() - _map_offset
+			var local_pos = get_local_mouse_position()
 			var hex = HexMath.pixel_to_axial(local_pos, HEX_SIZE)
 			if hex in _hex_coords:
 				hex_clicked.emit(hex)
@@ -292,7 +295,7 @@ func animate_replay_round(round_replays: Array, hex_objects_created: Array,
 		hex_objects_destroyed: Array) -> void:
 	# Animate all robot actions in this round, then update hex objects.
 	# Returns after animations are complete (caller should await).
-	var tweens: Array = []
+	var _tweens: Array = []
 
 	for robot_replay in round_replays:
 		var robot_id = robot_replay.get("robot_id", "")
@@ -306,8 +309,8 @@ func animate_replay_round(round_replays: Array, hex_objects_created: Array,
 
 		var from_hex = Vector2i(int(before_pos[0]), int(before_pos[1]))
 		var to_hex = Vector2i(int(after_pos[0]), int(after_pos[1]))
-		var from_pixel = HexMath.axial_to_pixel(from_hex, HEX_SIZE) + _map_offset
-		var to_pixel = HexMath.axial_to_pixel(to_hex, HEX_SIZE) + _map_offset
+		var from_pixel = HexMath.axial_to_pixel(from_hex, HEX_SIZE)
+		var to_pixel = HexMath.axial_to_pixel(to_hex, HEX_SIZE)
 
 		match anim_type:
 			"Move", "PowerMove":
