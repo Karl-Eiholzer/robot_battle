@@ -344,10 +344,25 @@ func _on_deploy_pressed() -> void:
 func _on_hex_clicked(hex: Vector2i) -> void:
 	match TurnInput.current_phase:
 		TurnInput.Phase.INPUT:
+			# Clicking on one of this player's robots selects it (higher priority than move targeting)
+			var robot_at = _find_my_robot_at_hex(hex)
+			if robot_at != "":
+				TurnInput.select_robot(robot_at)
+				return
+			# Otherwise, if a round is selected, treat the click as a move destination
 			if TurnInput.selected_robot_id != "" and _selected_round >= 0:
 				_handle_move_target(hex)
 		TurnInput.Phase.DEPLOY_TARGETING:
 			_handle_deploy_target(hex)
+
+func _find_my_robot_at_hex(hex: Vector2i) -> String:
+	for robot in GameState.player_robots:
+		if robot.get("player_id", "") != GameState.player_id:
+			continue
+		var pos = robot.get("position", [0, 0])
+		if int(pos[0]) == hex.x and int(pos[1]) == hex.y:
+			return robot.get("robot_id", "")
+	return ""
 
 func _handle_move_target(hex: Vector2i) -> void:
 	var robot_id = TurnInput.selected_robot_id

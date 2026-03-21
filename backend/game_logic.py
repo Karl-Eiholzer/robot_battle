@@ -643,7 +643,7 @@ def get_spawn_positions(map_size: str, team_size: int) -> Dict[int, List[List[in
     team1_spawns = []
 
     center_r = height // 2
-    spacing = 2  # Fixed tight spacing — robots cluster within ~2*N rows of center
+    spacing = 1  # Adjacent tiles — each player's robots spawn directly next to each other
     half_span = (robots_per_team - 1) * spacing // 2
 
     for i in range(robots_per_team):
