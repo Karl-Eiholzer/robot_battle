@@ -119,7 +119,9 @@ func _on_initial_state(data: Dictionary) -> void:
 	# Initial state only returned if robots exist
 	var player_robots = data.get("player_robots", [])
 	if player_robots.is_empty():
-		_show_status("Waiting for robots to spawn...")
+		# Don't overwrite a spawn error message — just keep polling silently
+		if error_label.text == "":
+			status_label.text = "Waiting for robots to spawn..."
 		return
 	GameState.initialize_from_initial_state(data)
 	poll_timer.stop()
@@ -136,7 +138,9 @@ func _on_request_failed(endpoint: String, _status_code: int, body: String) -> vo
 		assign_btn.disabled = false
 		_show_error("Role assignment failed: %s" % body)
 	elif endpoint.contains("initial_state"):
-		_show_status("Waiting for robots to be spawned by any player...")
+		# Poll silently — don't clear a spawn error message
+		if error_label.text == "":
+			status_label.text = "Waiting for robots to be spawned..."
 	else:
 		_show_error("Error: %s" % body)
 

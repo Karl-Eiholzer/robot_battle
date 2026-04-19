@@ -377,10 +377,14 @@ async def spawn_robots(
             detail="Map data not found"
         )
 
-    # Spawn robots
+    # Mark in_progress BEFORE spawning so concurrent idempotency check catches
+    # simultaneous requests before they each try to spawn robots.
+    redis_client.update_game_state(game_id, "in_progress")
+
     robots = spawn_robots_for_game(game_id, game_vars, map_data)
 
     if not robots:
+        redis_client.update_game_state(game_id, "lobby")  # rollback
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to spawn robots - check role assignments"
@@ -391,9 +395,6 @@ async def spawn_robots(
 
     # Initialize hex objects (empty at start)
     redis_client.store_hex_objects(game_id, [])
-
-    # Transition game to in_progress
-    redis_client.update_game_state(game_id, "in_progress")
 
     return SpawnRobotsResponse(
         success=True,
