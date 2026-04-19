@@ -25,11 +25,11 @@ Players are trying to keep their Captain from being captured while simultaneousl
 
 Teams alternate having the "Initiative".
 
-1. **Action Entry** Using Godot game client, all players enter the actions they want each robots to take before time runs out. Actions are entered one round at a time up to six rounds.
-2. **Action Review** Player can step forward and backward through the 6 rounds of actions to confirm all the actions
-3. **Submit and Transmit** Players click on "Submit Moves" button and the Godot game client sends the actions to the backend processor via API
+1. **Action Entry** Using Godot game client, all players plan their robots' actions round by round. The player works through all 6 rounds, assigning moves and deploys to each robot per round, before time runs out.
+2. **Action Review** Player can step freely forward and backward through the 6 rounds to review and edit any robot's planned actions at any time before submitting.
+3. **Submit and Transmit** Players click on "Submit Moves" button and the Godot game client sends the actions to the backend processor via API.
 4. **Wait for Results** Upon receipt of moves from all players, the backend processor combines the moves together, generates results, and makes results available for players to download.
-5. **Replay** Godot game client shows a replay of what happened during the turn, including the actions of any Robots controlled by other players that are in sight. Player
+5. **Replay** Godot game client shows a replay of what happened during the turn, including the actions of any Robots controlled by other players that are in sight. A "Replay Last Turn" button allows the player to re-watch the replay any number of times before the next turn begins.
 
 
 ### Player options within a turn
@@ -37,21 +37,52 @@ Teams alternate having the "Initiative".
 * Each "Turn" consists of 6 "Rounds"
 * In each "round" a Robot can either (a) "move" - move to an adjacent hex or (b) "wait" - stay in the same hex without moving
 * In addition to any "move" or "wait" action, Robots can choose the "Deploy" action
-* After entering actions for all Robots for a round, the player can then enter actions for the next round
-* if the Robot begins the Turn in a "Stunned" state, it will have "move" actions reduced to zero
 * Turn data for the Robots are initiated with the assumption that all Robots will execute 6 consecutive "wait" actions and not take any "deploy" actions
-* as the players input their actions, the initial data is overwritten - starting with the first round, moving to the second, etc...
-* Robots have different numbers of "move" actions that Robot can make each turn, depending on the type of robot.  See **Robot Types** below.
-* Robots are not required to use all "move" actions.
+* As the players input their actions, the initial "wait" actions are overwritten
+* Robots have different numbers of "move" actions that Robot can make each turn, depending on the type of robot. See **Robot Types** below.
+* Robots are not required to use all "move" actions
 * Robots can combine "move" and "wait" actions in any order in the 6 rounds
-* Player cannot enter a "move" action that would cause them to move into a hex occupied by another Robot or "obstructed"
-* Some hexes on the map have have terrain or obstructions such that the robot cannot legally move into that
-* What happens when the Robot uses the "Deploy" action depends on the type of robot.  See **Robot Types** below.
+* Player cannot enter a "move" action that would cause them to move into a hex that is "obstructed"
+* Some hexes on the map have terrain or obstructions such that the robot cannot legally move into them
+* What happens when the Robot uses the "Deploy" action depends on the type of robot. See **Robot Types** below.
 * Each "deploy" action costs the Robot one "Energy Point"
 * A "deploy" action cannot happen if the Robot has zero energy points
-* If no actions are entered prior to the time running out, the Robot perform 6 consecutive "wait" actions and 0 "deploy" actions
+* If a Robot begins the Turn in a "Stunned" state, it will have no "move" actions available
+* If no actions are entered prior to the time running out, the Robot performs 6 consecutive "wait" actions and 0 "deploy" actions
 * While inputting actions for each Robot, the player cannot see the actions being input by the other Players
 * While inputting actions for each Robot, the player can see the positions of all Robots
+
+### Game View Interface
+
+The game view screen is divided into three areas:
+
+**Top Bar (across the full width):**
+- Turn number, which team has initiative, and current phase (INPUT / REVIEWING)
+- Countdown timer showing seconds remaining to submit
+- Zoom In / Zoom Out buttons
+
+**Round Navigation Bar (below top bar, to the left of the right panel):**
+- **"< Prev"** and **"Next >"** buttons step through rounds one at a time
+- **R1 through R6** clickable buttons jump directly to any round; the active round is highlighted
+- Disabled during replay and while waiting for results
+
+**Right Panel:**
+- Current round label ("Round N of 6")
+- Robot status list: one button per robot showing type, current round's action (move destination or "wait"), energy, and move count used/max. Click a robot in the list to select or deselect it.
+- Deploy button: shows the deploy type for the selected robot. Activates deploy-targeting mode (or clears a deploy already set for this round if clicked again). Disabled when no robot is selected or the robot has zero energy.
+- Submit Turn button
+- Replay Last Turn button (enabled after the first replay completes)
+- Hint label: context-sensitive instructions (e.g. "Click a green hex to move")
+
+**Hex Map (center):**
+- Robots are displayed at their **projected positions** for the current round — where each robot will be if all its planned moves up through the previous round succeed. This lets the player see the board state at each step while planning.
+- **Planned move arrows** are drawn on the map showing each robot's intended destination for the current round.
+- **Single-click** a robot sprite on the map to select it. Selecting a robot highlights its valid adjacent destination hexes in green.
+- Single-click a highlighted green hex to assign a move to the selected robot for the current round.
+- Single-clicking the selected robot's hex again clears its move for the current round (reverting it to "wait").
+- Single-clicking anywhere outside a green hex or robot deselects the current robot.
+- **Cascade clearing**: changing a robot's move in an earlier round automatically clears all of that robot's moves and deploys in later rounds, since their starting positions would no longer be valid.
+- Scroll wheel zooms; middle-mouse or right-mouse drag pans the map.
 
 ### Player Timeout
 
@@ -263,7 +294,7 @@ While the game is in development, certain variables need to be changeable to tes
 The player who initiates a new game is provided a menu of options to select the variables. These variables include:
 * **Team Size** number of players on each team (2 or 3). Default 2
 * **Map Size** defined by the number of tiles high and number of tiles wide. Default "medium" (40 height 40 width"). Choice of "small" (20 height by 30 width) or "Large" (40 height 60 width).
-* **Input Time** amount of time each player has to enter their actions. Default to 90 seconds. Other options: 60 seconds, 120 seconds, 150 seconds.
+* **Input Time** amount of time each player has to enter their actions. Default to 120 seconds. Other options: 60 seconds, 90 seconds, 150 seconds.
 * **Review Time** amount of time each player has to view the replay at the end of the Turn. Default to 40 seconds. Other options: 20 seconds, 30 seconds, 50 seconds, 60 seconds.
 * **Energy Points** number of energy points each Robot starts with, between 0 and 3 (up to that Robot type's maximum), default to 2
 
