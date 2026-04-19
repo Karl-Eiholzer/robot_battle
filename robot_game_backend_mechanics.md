@@ -55,7 +55,7 @@ While the game is in development, certain variables need to be changeable to tes
 The JSON posted to the API from the Godot Client by the player who initiates a new game will include variables which affect game set-up. These variables include:
 * **Team Size** number of players on each team (2 or 3). Default 2
 * **Map Size** defined by the number of tiles high and number of tiles wide. Default "medium" (40 height 40 width"). Choice of "small" (20 height by 30 width) or "Large" (40 height 60 width).
-* **Input Time** amount of time each player has to enter their actions
+* **Input Time** amount of time each player has to enter their actions. Default 120 seconds.
 * **Review Time** amount of time each player has to view the replay at the end of the Turn
 * **Energy Points** number of energy points each Robot starts with, between 0 and 3 (up to that Robot type's maximum), default to 2
 
@@ -66,6 +66,18 @@ The backend processor uses these variables to configure the game at the start.
 One player on each team has assigned the roles to the players on that team and clicked "Ready", and that information is posted to the API
 
 Once the Ready Signal is received from both sides, the map and starting positions are generated and made available to be retrieved
+
+### Spawning Robots (`POST /game/{game_id}/spawn_robots`)
+
+Any player can call this endpoint once both teams have assigned roles. The endpoint:
+
+1. Validates that both Team 0 and Team 1 have role assignments stored
+2. **Marks the game `in_progress` immediately** (before spawning), so any concurrent spawn request from another player hits an idempotency check and receives the existing robots instead of attempting a second spawn
+3. Calls `spawn_robots_for_game()` to create Robot instances at their starting positions
+4. If spawning fails, rolls back game state to `lobby` and returns an error
+5. Stores the robots and initializes the hex objects list (empty at game start)
+
+**Idempotency:** If the game is already `in_progress` when this endpoint is called (e.g., a second player clicked Spawn simultaneously), the backend returns the existing robots immediately without re-spawning. This ensures multiple simultaneous Spawn clicks from different players are safe.
 
 ### Data to send to Godot Clients at start:
 
