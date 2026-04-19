@@ -56,7 +56,7 @@ class GameVariables(BaseModel):
     """Game configuration variables set at game creation"""
     team_size: int = Field(default=2, description="Players per team (2 or 3)")
     map_size: str = Field(default="medium", description="Map size: small, medium, large")
-    input_time: int = Field(default=90, description="Seconds for action input")
+    input_time: int = Field(default=120, description="Seconds for action input")
     review_time: int = Field(default=40, description="Seconds to review replay")
     starting_energy: int = Field(default=2, ge=0, le=3, description="Starting energy 0-3")
 
