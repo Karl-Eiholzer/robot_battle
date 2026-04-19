@@ -1,8 +1,10 @@
 extends Node2D
 
 # Main gameplay scene.
-# Handles input phase (action planning) and review phase (replay playback).
-# Manages the poll timer and coordinates between TurnInput, HexMap, and API.
+# Round-centric input: the player plans all robots' moves for round N, then
+# advances to round N+1. Navigation is free — prev/next buttons or click any
+# round indicator. Robots are shown at their projected positions for the
+# current round; move arrows show planned destinations.
 
 # ==================== Node References ====================
 
@@ -11,42 +13,57 @@ extends Node2D
 @onready var initiative_label: Label = $UI/TopBar/InitiativeLabel
 @onready var phase_label: Label = $UI/TopBar/PhaseLabel
 @onready var timer_label: Label = $UI/TopBar/TimerLabel
-@onready var robot_list: VBoxContainer = $UI/RightPanel/RightVBox/RobotList
-@onready var robot_stats: Label = $UI/RightPanel/RightVBox/RobotStats
-@onready var action_slots: VBoxContainer = $UI/RightPanel/RightVBox/ActionSlots
+@onready var zoom_in_btn: Button = $UI/TopBar/ZoomInBtn
+@onready var zoom_out_btn: Button = $UI/TopBar/ZoomOutBtn
+@onready var round_nav: HBoxContainer = $UI/RoundNav
+@onready var prev_round_btn: Button = $UI/RoundNav/PrevRoundBtn
+@onready var next_round_btn: Button = $UI/RoundNav/NextRoundBtn
+@onready var round_label: Label = $UI/RightPanel/RightVBox/RoundLabel
+@onready var robot_status_list: VBoxContainer = $UI/RightPanel/RightVBox/RobotStatusList
 @onready var deploy_btn: Button = $UI/RightPanel/RightVBox/DeployBtn
 @onready var submit_btn: Button = $UI/RightPanel/RightVBox/SubmitBtn
-@onready var validation_errors: Label = $UI/RightPanel/RightVBox/ValidationErrors
+@onready var replay_btn: Button = $UI/RightPanel/RightVBox/ReplayBtn
+@onready var hint_label: Label = $UI/RightPanel/RightVBox/HintLabel
 @onready var status_overlay: PanelContainer = $UI/StatusOverlay
 @onready var status_overlay_label: Label = $UI/StatusOverlay/StatusOverlayLabel
 @onready var poll_timer: Timer = $PollTimer
 @onready var input_timer: Timer = $InputTimer
 @onready var camera: Camera2D = $Camera2D
-@onready var zoom_in_btn: Button = $UI/TopBar/ZoomInBtn
-@onready var zoom_out_btn: Button = $UI/TopBar/ZoomOutBtn
-@onready var replay_btn: Button = $UI/RightPanel/RightVBox/ReplayBtn
 
 # ==================== State ====================
 
-var _selected_round: int = -1
-var _round_buttons: Array = []  # Array of Button nodes for the 6 round slots
-var _robot_buttons: Dictionary = {}  # robot_id -> Button
+# Six round indicator buttons (R1..R6), created in _ready() and inserted
+# between PrevRoundBtn and NextRoundBtn in the RoundNav bar.
+var _round_nav_btns: Array = []
+
 var _input_time_remaining: float = 0.0
+var _last_replay: Dictionary = {}
 
 # Camera pan state
 var _is_panning: bool = false
 var _pan_start_mouse: Vector2 = Vector2.ZERO
 var _pan_start_camera: Vector2 = Vector2.ZERO
 
-# Last completed turn replay (for re-watching)
-var _last_replay: Dictionary = {}
-
 # ==================== Ready ====================
 
 func _ready() -> void:
-	# Connect signals
+	# Build R1..R6 buttons and insert them between Prev and Next in the bar.
+	# After adding each button to the end it is moved to the correct index:
+	# Prev=0, R1=1, R2=2, ..., R6=6, Next=7.
+	for i in range(TurnInput.ROUNDS_PER_TURN):
+		var btn = Button.new()
+		btn.text = "R%d" % (i + 1)
+		btn.custom_minimum_size = Vector2(44, 0)
+		btn.toggle_mode = true
+		btn.pressed.connect(_on_round_nav_pressed.bind(i))
+		round_nav.add_child(btn)
+		round_nav.move_child(btn, 1 + i)  # slide in before Next
+		_round_nav_btns.append(btn)
+
+	# Signal connections
 	hex_map.hex_clicked.connect(_on_hex_clicked)
-	hex_map.hex_double_clicked.connect(_on_hex_double_clicked)
+	prev_round_btn.pressed.connect(_on_prev_round)
+	next_round_btn.pressed.connect(_on_next_round)
 	submit_btn.pressed.connect(_on_submit_pressed)
 	deploy_btn.pressed.connect(_on_deploy_pressed)
 	zoom_in_btn.pressed.connect(_on_zoom_in)
@@ -56,6 +73,7 @@ func _ready() -> void:
 	input_timer.timeout.connect(_on_input_timer_expired)
 
 	TurnInput.phase_changed.connect(_on_phase_changed)
+	TurnInput.current_round_changed.connect(_on_current_round_changed)
 	TurnInput.robot_selected.connect(_on_robot_selected)
 	TurnInput.action_plan_changed.connect(_on_action_plan_changed)
 
@@ -65,19 +83,15 @@ func _ready() -> void:
 
 	GameState.robots_updated.connect(_on_robots_updated)
 
-	# Initialize map and UI
+	# Populate map first, then start input phase (which fires current_round_changed
+	# and triggers _update_round_display while action_plan and sprites are ready).
 	hex_map.populate_from_game_state()
 	camera.position = hex_map.get_player_robots_centroid()
-	_rebuild_robot_list()
 	_update_header()
-
-	# Start input phase
 	TurnInput.start_input_phase()
 
-	# Start input timer if configured
 	var input_time = GameState.game_variables.get("input_time", 90)
 	if input_time > 0:
-		_input_time_remaining = float(input_time)
 		input_timer.wait_time = float(input_time)
 		input_timer.start()
 
@@ -102,12 +116,12 @@ func _input(event: InputEvent) -> void:
 			match btn:
 				MOUSE_BUTTON_WHEEL_UP:
 					if event.shift_pressed:
-						camera.position.y -= pan_step  # Shift+scroll up = pan up
+						camera.position.y -= pan_step
 					else:
 						_apply_zoom(1.15)
 				MOUSE_BUTTON_WHEEL_DOWN:
 					if event.shift_pressed:
-						camera.position.y += pan_step  # Shift+scroll down = pan down
+						camera.position.y += pan_step
 					else:
 						_apply_zoom(1.0 / 1.15)
 				MOUSE_BUTTON_WHEEL_LEFT:
@@ -135,279 +149,290 @@ func _update_header() -> void:
 	var phase_name = TurnInput.Phase.keys()[TurnInput.current_phase]
 	phase_label.text = "Phase: " + phase_name
 
-# ==================== Robot List ====================
+# ==================== Round Navigation ====================
 
-func _rebuild_robot_list() -> void:
-	for child in robot_list.get_children():
-		child.queue_free()
-	_robot_buttons.clear()
+func _on_prev_round() -> void:
+	if TurnInput.current_phase != TurnInput.Phase.INPUT:
+		return
+	if TurnInput.current_round > 0:
+		TurnInput.set_current_round(TurnInput.current_round - 1)
 
-	for robot in GameState.player_robots:
-		if robot.get("player_id", "") != GameState.player_id:
-			continue  # Skip robots belonging to teammates
-		var robot_id = robot.get("robot_id", "")
-		var robot_type = robot.get("type", "?")
-		var _team = robot.get("team", 0)
-		var energy = robot.get("energy", 0)
-		var state_str = robot.get("state", "active")
+func _on_next_round() -> void:
+	if TurnInput.current_phase != TurnInput.Phase.INPUT:
+		return
+	if TurnInput.current_round < TurnInput.ROUNDS_PER_TURN - 1:
+		TurnInput.set_current_round(TurnInput.current_round + 1)
 
-		var btn = Button.new()
-		btn.text = "[%s] %s E:%d%s" % [
-			robot_type.substr(0, 1).to_upper(),
-			robot_type,
-			energy,
-			" (STUNNED)" if state_str == "stunned" else ""
-		]
-		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		btn.custom_minimum_size = Vector2(0, 32)
-		btn.pressed.connect(_on_robot_button_pressed.bind(robot_id))
-		robot_list.add_child(btn)
-		_robot_buttons[robot_id] = btn
+func _on_round_nav_pressed(round_idx: int) -> void:
+	if TurnInput.current_phase != TurnInput.Phase.INPUT:
+		return
+	TurnInput.set_current_round(round_idx)
+
+func _on_current_round_changed(_round_num: int) -> void:
+	_update_round_display()
+
+func _update_round_display() -> void:
+	var r = TurnInput.current_round
+	round_label.text = "Round %d of %d" % [r + 1, TurnInput.ROUNDS_PER_TURN]
+
+	for i in range(_round_nav_btns.size()):
+		_round_nav_btns[i].button_pressed = (i == r)
+
+	hex_map.update_projected_positions(TurnInput.action_plan, r, GameState.robot_lookup)
+	_rebuild_robot_status_list()
+
+	if TurnInput.selected_robot_id != "":
+		_show_adjacent_for_selected_robot()
+	else:
+		hex_map.clear_adjacent_highlights()
+
+	_update_deploy_button()
 
 # ==================== Robot Selection ====================
 
-func _on_robot_button_pressed(robot_id: String) -> void:
-	if TurnInput.current_phase != TurnInput.Phase.INPUT:
-		return
-	TurnInput.select_robot(robot_id)
-
 func _on_robot_selected(robot_id: String) -> void:
-	# Highlight selected button in right panel
-	for rid in _robot_buttons.keys():
-		_robot_buttons[rid].button_pressed = (rid == robot_id)
-
-	# Highlight robot sprite on map
 	hex_map.set_selected_robot(robot_id)
 
-	# Pan camera to center on the selected robot
-	var robot = GameState.robot_lookup.get(robot_id, {})
-	if not robot.is_empty():
-		var pos = robot.get("position", [0, 0])
-		camera.position = HexMath.axial_to_pixel(Vector2i(int(pos[0]), int(pos[1])), HexMath.HEX_SIZE)
-
-	_update_robot_stats(robot_id)
-	_rebuild_action_slots(robot_id)
-	_update_deploy_button(robot_id)
-	_selected_round = -1
-
-func _update_robot_stats(robot_id: String) -> void:
-	var robot = GameState.robot_lookup.get(robot_id, {})
-	if robot.is_empty():
-		robot_stats.text = "(none selected)"
+	if robot_id == "":
+		hex_map.clear_adjacent_highlights()
+		hint_label.text = ""
+		_update_deploy_button()
+		_rebuild_robot_status_list()
 		return
 
-	var stats = TurnInput.ROBOT_STATS.get(robot.get("type", ""), {})
-	robot_stats.text = """Type: %s
-Energy: %d / %d
-Moves/turn: %d (planned: %d)
-Strength: %d
-Sight: %d
-Deploy: %s
-State: %s""" % [
-		robot.get("type", "?"),
-		robot.get("energy", 0),
-		stats.get("max_energy", 0),
-		TurnInput.get_max_moves(robot_id),
-		TurnInput.count_moves_planned(robot_id),
-		stats.get("strength", 0),
-		stats.get("sight_range", 0),
-		stats.get("deploy_type", "?"),
-		robot.get("state", "active"),
-	]
+	# Pan to the robot's projected position for the current round
+	var r = TurnInput.current_round
+	var proj_pos = TurnInput.get_projected_position(robot_id, r - 1)
+	camera.position = HexMath.axial_to_pixel(
+		Vector2i(int(proj_pos[0]), int(proj_pos[1])), HexMath.HEX_SIZE)
 
-# ==================== Action Slots ====================
+	_show_adjacent_for_selected_robot()
+	_update_deploy_button()
+	_rebuild_robot_status_list()
 
-func _rebuild_action_slots(robot_id: String) -> void:
-	for child in action_slots.get_children():
+# Show green highlights on adjacent hexes the selected robot can move to.
+func _show_adjacent_for_selected_robot() -> void:
+	var robot_id = TurnInput.selected_robot_id
+	if robot_id == "":
+		hex_map.clear_adjacent_highlights()
+		return
+
+	var r = TurnInput.current_round
+	var proj_pos = TurnInput.get_projected_position(robot_id, r - 1)
+	var proj_hex = Vector2i(int(proj_pos[0]), int(proj_pos[1]))
+
+	# If move limit is already reached and this round isn't already a move, no moves possible.
+	var rounds = TurnInput.action_plan.get(robot_id, [])
+	var this_round_is_move = (r < rounds.size() and rounds[r].get("action_type", "wait") == "move")
+	var at_limit = TurnInput.count_moves_planned(robot_id) >= TurnInput.get_max_moves(robot_id)
+
+	if at_limit and not this_round_is_move:
+		hex_map.clear_adjacent_highlights()
+		hint_label.text = "Move limit reached (%d/%d). Click robot to select, or choose another round." % [
+			TurnInput.count_moves_planned(robot_id), TurnInput.get_max_moves(robot_id)]
+		return
+
+	var neighbors = HexMath.axial_neighbors(proj_hex)
+	var valid: Array = []
+	for n in neighbors:
+		if hex_map.has_hex(n):
+			valid.append(n)
+	hex_map.highlight_adjacent_hexes(valid)
+
+	if this_round_is_move:
+		hint_label.text = "Click robot to clear move. Click another hex to change destination."
+	else:
+		hint_label.text = "Click a green hex to move. Click robot to skip (wait)."
+
+# ==================== Robot Status Panel ====================
+
+func _rebuild_robot_status_list() -> void:
+	for child in robot_status_list.get_children():
 		child.queue_free()
-	_round_buttons.clear()
-	_selected_round = -1
 
-	var rounds = TurnInput.action_plan.get(robot_id, [])
-	for i in range(rounds.size()):
-		var round_data = rounds[i]
-		var hbox = HBoxContainer.new()
-		action_slots.add_child(hbox)
+	var r = TurnInput.current_round
 
-		var round_lbl = Label.new()
-		round_lbl.text = "R%d:" % (i + 1)
-		round_lbl.custom_minimum_size = Vector2(28, 0)
-		hbox.add_child(round_lbl)
+	for robot in GameState.player_robots:
+		if robot.get("player_id", "") != GameState.player_id:
+			continue
+		var robot_id = robot.get("robot_id", "")
+		var robot_type = robot.get("type", "?")
+		var energy = robot.get("energy", 0)
+		var state_str = robot.get("state", "active")
+		var is_selected = (robot_id == TurnInput.selected_robot_id)
 
-		var move_btn = Button.new()
-		move_btn.text = "Move"
-		move_btn.toggle_mode = true
-		move_btn.button_pressed = (round_data.get("action_type", "wait") == "move")
-		move_btn.custom_minimum_size = Vector2(54, 28)
-		move_btn.pressed.connect(_on_round_move_toggle.bind(robot_id, i, move_btn))
-		hbox.add_child(move_btn)
+		var rounds = TurnInput.action_plan.get(robot_id, [])
+		var round_data = rounds[r] if r < rounds.size() else {}
+		var action_type = round_data.get("action_type", "wait")
+		var has_deploy = round_data.get("deploy", null) != null
 
-		var pos_lbl = Label.new()
-		var after = round_data.get("after_position", [0, 0])
-		pos_lbl.text = "(%d,%d)" % [after[0], after[1]]
-		pos_lbl.custom_minimum_size = Vector2(64, 0)
-		pos_lbl.add_theme_font_size_override("font_size", 11)
-		hbox.add_child(pos_lbl)
+		var action_str: String
+		if action_type == "move":
+			var after = round_data.get("after_position", [0, 0])
+			action_str = "→(%d,%d)" % [after[0], after[1]]
+		else:
+			action_str = "wait"
+		if has_deploy:
+			action_str += " [D]"
+		if state_str == "stunned":
+			action_str += " ☠"
 
-		var deploy_indicator = Label.new()
-		var deploy = round_data.get("deploy", null)
-		deploy_indicator.text = "[D]" if deploy != null else ""
-		deploy_indicator.add_theme_color_override("font_color", Color(0.8, 0.4, 1.0))
-		deploy_indicator.add_theme_font_size_override("font_size", 11)
-		hbox.add_child(deploy_indicator)
+		var used_moves = TurnInput.count_moves_planned(robot_id)
+		var max_moves = TurnInput.get_max_moves(robot_id)
 
-		# Select round button (for deploy targeting)
-		var sel_btn = Button.new()
-		sel_btn.text = "Sel"
-		sel_btn.custom_minimum_size = Vector2(36, 28)
-		sel_btn.pressed.connect(_on_select_round.bind(i))
-		hbox.add_child(sel_btn)
+		var btn = Button.new()
+		btn.text = "[%s] %s  E:%d  %d/%d mv" % [
+			robot_type.substr(0, 1).to_upper(),
+			action_str, energy, used_moves, max_moves
+		]
+		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		btn.toggle_mode = true
+		btn.button_pressed = is_selected
+		btn.custom_minimum_size = Vector2(0, 32)
+		btn.add_theme_font_size_override("font_size", 12)
+		btn.pressed.connect(_on_robot_status_pressed.bind(robot_id))
+		robot_status_list.add_child(btn)
 
-		_round_buttons.append(hbox)
-
-func _on_round_move_toggle(robot_id: String, round_num: int, btn: Button) -> void:
+func _on_robot_status_pressed(robot_id: String) -> void:
 	if TurnInput.current_phase != TurnInput.Phase.INPUT:
-		btn.button_pressed = not btn.button_pressed
 		return
-
-	var action_type = "move" if btn.button_pressed else "wait"
-
-	# Check move limit
-	if action_type == "move":
-		if TurnInput.count_moves_planned(robot_id) >= TurnInput.get_max_moves(robot_id):
-			btn.button_pressed = false
-			validation_errors.text = "Move limit reached for this robot."
-			return
-
-	var robot = GameState.robot_lookup.get(robot_id, {})
-	var pos = robot.get("position", [0, 0])
-
-	# Get the before position from previous round's after position
-	var rounds = TurnInput.action_plan.get(robot_id, [])
-	var before_pos = pos.duplicate() if pos is Array else [0, 0]
-	if round_num > 0 and rounds.size() > round_num - 1:
-		before_pos = rounds[round_num - 1].get("after_position", before_pos)
-
-	TurnInput.set_round_action(robot_id, round_num, action_type, before_pos, before_pos)
-	_rebuild_action_slots(robot_id)
-	_update_robot_stats(robot_id)
-	validation_errors.text = ""
-
-func _on_select_round(round_num: int) -> void:
-	_selected_round = round_num
-	validation_errors.text = "Round %d selected. Click a hex to set destination." % (round_num + 1)
-	_update_deploy_button(TurnInput.selected_robot_id)
-
-func _on_action_plan_changed() -> void:
-	hex_map.update_move_path_highlights(TurnInput.action_plan, GameState.robot_lookup)
-	if TurnInput.selected_robot_id != "":
-		_rebuild_action_slots(TurnInput.selected_robot_id)
-		_update_robot_stats(TurnInput.selected_robot_id)
+	if TurnInput.selected_robot_id == robot_id:
+		TurnInput.select_robot("")
+	else:
+		TurnInput.select_robot(robot_id)
 
 # ==================== Deploy Button ====================
 
-func _update_deploy_button(robot_id: String) -> void:
+func _update_deploy_button() -> void:
+	var robot_id = TurnInput.selected_robot_id
 	if robot_id == "":
 		deploy_btn.disabled = true
-		deploy_btn.text = "Deploy (select robot first)"
+		deploy_btn.text = "Deploy (select robot)"
 		return
 
 	var robot = GameState.robot_lookup.get(robot_id, {})
 	var energy = robot.get("energy", 0)
 	var deploy_type = TurnInput.ROBOT_STATS.get(robot.get("type", ""), {}).get("deploy_type", "")
+	var r = TurnInput.current_round
+	var rounds = TurnInput.action_plan.get(robot_id, [])
+	var has_deploy = (r < rounds.size() and rounds[r].get("deploy", null) != null)
 
-	if energy <= 0:
+	if has_deploy:
+		deploy_btn.disabled = false
+		deploy_btn.text = "Clear Deploy (R%d)" % (r + 1)
+	elif energy <= 0:
 		deploy_btn.disabled = true
-		deploy_btn.text = "Deploy (no energy)"
-	elif _selected_round < 0:
-		deploy_btn.disabled = true
-		deploy_btn.text = "Deploy %s (select round first)" % deploy_type
+		deploy_btn.text = "Deploy %s (no energy)" % deploy_type
 	else:
 		deploy_btn.disabled = false
-		deploy_btn.text = "Deploy %s on Round %d" % [deploy_type, _selected_round + 1]
+		deploy_btn.text = "Deploy %s on R%d" % [deploy_type, r + 1]
 
 func _on_deploy_pressed() -> void:
-	if TurnInput.selected_robot_id == "" or _selected_round < 0:
+	var robot_id = TurnInput.selected_robot_id
+	if robot_id == "":
 		return
 
-	var deploy_type_local = TurnInput.ROBOT_STATS.get(
-		GameState.robot_lookup.get(TurnInput.selected_robot_id, {}).get("type", ""),
-		{}).get("deploy_type", "")
+	var r = TurnInput.current_round
+	var rounds = TurnInput.action_plan.get(robot_id, [])
+
+	# Toggle: clear existing deploy if present
+	if r < rounds.size() and rounds[r].get("deploy", null) != null:
+		TurnInput.clear_deploy_for_round(robot_id, r)
+		return
+
+	var robot = GameState.robot_lookup.get(robot_id, {})
+	if robot.get("energy", 0) <= 0:
+		return
+
+	var deploy_type_local = TurnInput.ROBOT_STATS.get(robot.get("type", ""), {}).get("deploy_type", "")
 
 	if deploy_type_local == "extra_moves":
-		# No targeting needed — apply immediately
-		TurnInput.confirm_deploy_target([GameState.robot_lookup[TurnInput.selected_robot_id].get("position", [0,0])])
+		# No targeting needed — self-applied immediately
+		TurnInput.start_deploy_targeting(robot_id, r)
+		TurnInput.confirm_deploy_target([robot.get("position", [0, 0])])
 		return
 
-	# Show valid targets
-	var targets = TurnInput.get_valid_deploy_targets(TurnInput.selected_robot_id)
+	var proj_pos = TurnInput.get_projected_position(robot_id, r - 1)
+	var targets = TurnInput.get_valid_deploy_targets(robot_id, proj_pos)
 	hex_map.highlight_hexes(targets, Color(0.8, 0.4, 1.0, 0.6))
-	TurnInput.start_deploy_targeting(TurnInput.selected_robot_id, _selected_round)
-	validation_errors.text = "Click a highlighted hex to deploy %s" % deploy_type_local
+	TurnInput.start_deploy_targeting(robot_id, r)
+	hint_label.text = "Click a highlighted hex to deploy %s" % deploy_type_local
 
-# ==================== Hex Click ====================
+# ==================== Hex Click Handling ====================
 
 func _on_hex_clicked(hex: Vector2i) -> void:
 	match TurnInput.current_phase:
 		TurnInput.Phase.INPUT:
-			if TurnInput.selected_robot_id != "" and _selected_round >= 0:
-				_handle_move_target(hex)
+			_handle_input_click(hex)
 		TurnInput.Phase.DEPLOY_TARGETING:
 			_handle_deploy_target(hex)
 
-func _on_hex_double_clicked(hex: Vector2i) -> void:
-	if TurnInput.current_phase != TurnInput.Phase.INPUT:
-		return
-	var robot_id = _find_my_robot_at_hex(hex)
-	if robot_id != "":
-		TurnInput.select_robot(robot_id)
+func _handle_input_click(hex: Vector2i) -> void:
+	var robot_id = TurnInput.selected_robot_id
+	var r = TurnInput.current_round
 
-func _find_my_robot_at_hex(hex: Vector2i) -> String:
+	# Check if the click lands on one of my robots at their projected position.
+	var clicked_robot = _find_my_robot_at_projected_hex(hex, r)
+	if clicked_robot != "":
+		if clicked_robot == robot_id:
+			# Re-clicking the selected robot clears its move for this round.
+			TurnInput.clear_move_for_round(robot_id, r)
+			_show_adjacent_for_selected_robot()
+		else:
+			TurnInput.select_robot(clicked_robot)
+		return
+
+	# Not a robot hex.
+	if robot_id == "":
+		return
+
+	# Robot selected — check if hex is an adjacent valid move.
+	var proj_pos = TurnInput.get_projected_position(robot_id, r - 1)
+	var proj_hex = Vector2i(int(proj_pos[0]), int(proj_pos[1]))
+
+	if HexMath.axial_distance(proj_hex, hex) == 1:
+		_assign_move(robot_id, r, hex)
+	else:
+		# Click elsewhere deselects.
+		TurnInput.select_robot("")
+
+func _find_my_robot_at_projected_hex(hex: Vector2i, round_num: int) -> String:
 	for robot in GameState.player_robots:
 		if robot.get("player_id", "") != GameState.player_id:
 			continue
-		var pos = robot.get("position", [0, 0])
-		if int(pos[0]) == hex.x and int(pos[1]) == hex.y:
-			return robot.get("robot_id", "")
+		var robot_id = robot.get("robot_id", "")
+		var proj = TurnInput.get_projected_position(robot_id, round_num - 1)
+		if int(proj[0]) == hex.x and int(proj[1]) == hex.y:
+			return robot_id
 	return ""
 
-func _handle_move_target(hex: Vector2i) -> void:
-	var robot_id = TurnInput.selected_robot_id
-	var robot = GameState.robot_lookup.get(robot_id, {})
+func _assign_move(robot_id: String, round_num: int, dest_hex: Vector2i) -> void:
 	var rounds = TurnInput.action_plan.get(robot_id, [])
+	var current_action = rounds[round_num].get("action_type", "wait") if round_num < rounds.size() else "wait"
 
-	# Get before position for this round
-	var before_pos: Array = robot.get("position", [0, 0])
-	if _selected_round > 0 and rounds.size() > _selected_round - 1:
-		before_pos = rounds[_selected_round - 1].get("after_position", before_pos)
-
-	var after_pos = [hex.x, hex.y]
-
-	# Validate adjacency (moves must be to adjacent hexes)
-	var before_hex = Vector2i(int(before_pos[0]), int(before_pos[1]))
-	if HexMath.axial_distance(before_hex, hex) != 1:
-		validation_errors.text = "Must move to an adjacent hex."
-		return
-
-	# Check move count
-	var current_action = rounds[_selected_round].get("action_type", "wait")
+	# Check move limit when adding a new move (not when replacing existing).
 	if current_action == "wait":
-		# Setting to move — check limit
 		if TurnInput.count_moves_planned(robot_id) >= TurnInput.get_max_moves(robot_id):
-			validation_errors.text = "Move limit reached."
+			hint_label.text = "Move limit reached — can't add more moves for this robot."
 			return
 
-	TurnInput.set_round_action(robot_id, _selected_round, "move", before_pos, after_pos)
-	validation_errors.text = ""
-	hex_map.clear_highlights()
-	_rebuild_action_slots(robot_id)
-	_update_robot_stats(robot_id)
+	TurnInput.set_move_for_round(robot_id, round_num, [dest_hex.x, dest_hex.y])
+	hint_label.text = ""
 
 func _handle_deploy_target(hex: Vector2i) -> void:
 	TurnInput.confirm_deploy_target([[hex.x, hex.y]])
 	hex_map.clear_highlights()
-	_rebuild_action_slots(TurnInput.selected_robot_id)
-	validation_errors.text = ""
+	hint_label.text = ""
+
+# ==================== Action Plan Changed ====================
+
+func _on_action_plan_changed() -> void:
+	var r = TurnInput.current_round
+	hex_map.update_projected_positions(TurnInput.action_plan, r, GameState.robot_lookup)
+	_rebuild_robot_status_list()
+	_update_deploy_button()
+	if TurnInput.selected_robot_id != "":
+		_show_adjacent_for_selected_robot()
 
 # ==================== Submit ====================
 
@@ -417,7 +442,7 @@ func _on_submit_pressed() -> void:
 
 	var errors = TurnInput.validate_plan()
 	if errors.size() > 0:
-		validation_errors.text = "\n".join(errors)
+		hint_label.text = errors[0]
 		return
 
 	var payload = TurnInput.build_submit_payload()
@@ -428,7 +453,6 @@ func _on_submit_pressed() -> void:
 	APIClient.submit_actions(GameState.game_id, GameState.current_turn, payload)
 
 func _on_input_timer_expired() -> void:
-	# Auto-submit with current plan when time runs out
 	if TurnInput.current_phase == TurnInput.Phase.INPUT:
 		_on_submit_pressed()
 
@@ -437,7 +461,7 @@ func _on_input_timer_expired() -> void:
 func _on_moves_submitted(data: Dictionary) -> void:
 	var errors = data.get("validation_errors", [])
 	if errors.size() > 0:
-		validation_errors.text = "Server validation: " + "\n".join(errors)
+		hint_label.text = "Server: " + errors[0]
 		TurnInput.set_phase(TurnInput.Phase.INPUT)
 		submit_btn.disabled = false
 		return
@@ -454,7 +478,6 @@ func _on_poll_timer() -> void:
 
 func _on_results_received(data: Dictionary) -> void:
 	if not data.get("ready", false):
-		# Not ready yet, keep polling
 		return
 
 	poll_timer.stop()
@@ -465,7 +488,6 @@ func _on_results_received(data: Dictionary) -> void:
 	if replay != null:
 		_play_replay(replay, data)
 	else:
-		# No replay data, just update state
 		GameState.apply_turn_results(data)
 		if winner != null:
 			_go_to_game_end(winner)
@@ -476,11 +498,11 @@ func _on_request_failed(endpoint: String, _status_code: int, body: String) -> vo
 	if endpoint.contains("submit"):
 		TurnInput.set_phase(TurnInput.Phase.INPUT)
 		submit_btn.disabled = false
-		validation_errors.text = "Submit failed: %s" % body
+		hint_label.text = "Submit failed: %s" % body
 	elif endpoint.contains("results"):
 		pass  # Keep polling
 	else:
-		validation_errors.text = "Error: %s" % body
+		hint_label.text = "Error: %s" % body
 
 # ==================== Replay Playback ====================
 
@@ -493,29 +515,19 @@ func _play_replay(replay: Dictionary, full_results: Dictionary) -> void:
 	var hex_objects_destroyed = replay.get("hex_objects_destroyed", [])
 	var winner = replay.get("winner", null)
 
-	# Play each round sequentially
 	for round_idx in range(rounds.size()):
-		var round_replays = rounds[round_idx]
-		# Spread hex object events across rounds proportionally
 		var created_this_round: Array = []
 		var destroyed_this_round: Array = []
 		if round_idx == rounds.size() - 1:
-			# Apply all hex object changes at the last round
 			created_this_round = hex_objects_created
 			destroyed_this_round = hex_objects_destroyed
 
-		hex_map.animate_replay_round(round_replays, created_this_round, destroyed_this_round)
-
-		# Wait for animations to complete
+		hex_map.animate_replay_round(rounds[round_idx], created_this_round, destroyed_this_round)
 		await get_tree().create_timer(0.6).timeout
 
-	# Brief pause after replay
 	await get_tree().create_timer(0.5).timeout
 
-	# Store replay so the player can rewatch it
 	_last_replay = replay
-
-	# Update game state
 	GameState.apply_turn_results(full_results)
 	_hide_overlay()
 
@@ -529,17 +541,13 @@ func _replay_last_turn() -> void:
 	if _last_replay.is_empty():
 		return
 
-	# Disable controls during playback
 	replay_btn.disabled = true
 	submit_btn.disabled = true
 	var saved_robot_id = TurnInput.selected_robot_id
 
 	_show_overlay("Replaying turn...")
-
-	# Reset map to the state at the start of the recorded turn
 	hex_map.reset_for_replay(_last_replay)
 
-	# Animate each round (identical logic to _play_replay, no state changes)
 	var rounds = _last_replay.get("rounds", [])
 	var hex_objects_created = _last_replay.get("hex_objects_created", [])
 	var hex_objects_destroyed = _last_replay.get("hex_objects_destroyed", [])
@@ -554,11 +562,12 @@ func _replay_last_turn() -> void:
 
 	await get_tree().create_timer(0.5).timeout
 
-	# Restore current post-turn map state and UI
+	# Restore planning view for the current round
 	hex_map.populate_from_game_state()
-	hex_map.update_move_path_highlights(TurnInput.action_plan, GameState.robot_lookup)
+	_update_round_display()
 	if saved_robot_id != "":
 		hex_map.set_selected_robot(saved_robot_id)
+		TurnInput.select_robot(saved_robot_id)
 
 	_hide_overlay()
 	replay_btn.disabled = false
@@ -571,21 +580,18 @@ func _start_next_turn() -> void:
 	hex_map.populate_from_game_state()
 	hex_map.set_selected_robot("")
 	camera.position = hex_map.get_player_robots_centroid()
-	_rebuild_robot_list()
 	_update_header()
-	TurnInput.start_input_phase()
-	validation_errors.text = ""
+	hint_label.text = ""
+	TurnInput.start_input_phase()  # emits current_round_changed(0) → _update_round_display()
 
 	var input_time = GameState.game_variables.get("input_time", 90)
 	if input_time > 0:
-		_input_time_remaining = float(input_time)
 		input_timer.wait_time = float(input_time)
 		input_timer.start()
 
 func _go_to_game_end(winner: int) -> void:
 	GameState.game_state_str = "complete"
-	# Store winner for game_end scene
-	GameState.initiative_team = winner  # Reuse field temporarily
+	GameState.initiative_team = winner
 	get_tree().change_scene_to_file("res://scenes/game_end.tscn")
 
 # ==================== Phase Changes ====================
@@ -596,18 +602,20 @@ func _on_phase_changed(new_phase: TurnInput.Phase) -> void:
 		TurnInput.Phase.INPUT:
 			submit_btn.disabled = false
 			_hide_overlay()
+			hex_map.clear_highlights()
 		TurnInput.Phase.DEPLOY_TARGETING:
 			submit_btn.disabled = true
 		TurnInput.Phase.SUBMITTING:
 			submit_btn.disabled = true
 		TurnInput.Phase.REVIEWING:
 			submit_btn.disabled = true
-			hex_map.clear_move_path_highlights()
+			hex_map.clear_adjacent_highlights()
+			hex_map.clear_highlights()
+			hex_map.clear_path_highlights()
+			hint_label.text = ""
 
 func _on_robots_updated() -> void:
-	_rebuild_robot_list()
-	if TurnInput.selected_robot_id != "":
-		_update_robot_stats(TurnInput.selected_robot_id)
+	_rebuild_robot_status_list()
 
 # ==================== Overlay ====================
 

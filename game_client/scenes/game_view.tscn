@@ -39,6 +39,10 @@ text = "Phase: INPUT"
 theme_override_font_sizes/font_size = 14
 theme_override_colors/font_color = Color(0.4, 1.0, 0.4, 1)
 
+[node name="TopBarSpacer" type="Control" parent="UI/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
 [node name="TimerLabel" type="Label" parent="UI/TopBar"]
 layout_mode = 2
 text = ""
@@ -57,6 +61,34 @@ custom_minimum_size = Vector2(36, 0)
 text = "-"
 tooltip_text = "Zoom Out (scroll down)"
 
+[node name="RoundNav" type="HBoxContainer" parent="UI"]
+layout_mode = 1
+anchors_preset = 12
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_top = 40
+offset_bottom = 84
+offset_right = -260
+theme_override_constants/separation = 4
+
+[node name="PrevRoundBtn" type="Button" parent="UI/RoundNav"]
+layout_mode = 2
+custom_minimum_size = Vector2(72, 0)
+text = "< Prev"
+tooltip_text = "Go back to previous round"
+
+[node name="RoundNavSpacer" type="Control" parent="UI/RoundNav"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="NextRoundBtn" type="Button" parent="UI/RoundNav"]
+layout_mode = 2
+custom_minimum_size = Vector2(72, 0)
+text = "Next >"
+tooltip_text = "Advance to next round"
+
 [node name="RightPanel" type="PanelContainer" parent="UI"]
 layout_mode = 1
 anchors_preset = 3
@@ -64,55 +96,34 @@ anchor_left = 1.0
 anchor_top = 0.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -280
+offset_left = -260
 offset_top = 40
 
 [node name="RightVBox" type="VBoxContainer" parent="UI/RightPanel"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
-[node name="RobotListLabel" type="Label" parent="UI/RightPanel/RightVBox"]
+[node name="RoundLabel" type="Label" parent="UI/RightPanel/RightVBox"]
 layout_mode = 2
-text = "Your Robots:"
-theme_override_font_sizes/font_size = 14
+text = "Round 1 of 6"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 15
+theme_override_colors/font_color = Color(0.9, 0.9, 0.5, 1)
 
-[node name="RobotList" type="VBoxContainer" parent="UI/RightPanel/RightVBox"]
+[node name="RobotStatusList" type="VBoxContainer" parent="UI/RightPanel/RightVBox"]
 layout_mode = 2
 theme_override_constants/separation = 4
 
 [node name="Separator1" type="HSeparator" parent="UI/RightPanel/RightVBox"]
 layout_mode = 2
 
-[node name="RobotInfoLabel" type="Label" parent="UI/RightPanel/RightVBox"]
+[node name="DeployBtn" type="Button" parent="UI/RightPanel/RightVBox"]
 layout_mode = 2
-text = "Selected Robot:"
-theme_override_font_sizes/font_size = 14
-
-[node name="RobotStats" type="Label" parent="UI/RightPanel/RightVBox"]
-layout_mode = 2
-text = "(none selected)"
-autowrap_mode = 3
-theme_override_font_sizes/font_size = 12
+text = "Deploy (select robot)"
+disabled = true
 
 [node name="Separator2" type="HSeparator" parent="UI/RightPanel/RightVBox"]
 layout_mode = 2
-
-[node name="ActionSlotsLabel" type="Label" parent="UI/RightPanel/RightVBox"]
-layout_mode = 2
-text = "Actions (6 rounds):"
-theme_override_font_sizes/font_size = 13
-
-[node name="ActionSlots" type="VBoxContainer" parent="UI/RightPanel/RightVBox"]
-layout_mode = 2
-theme_override_constants/separation = 2
-
-[node name="Separator3" type="HSeparator" parent="UI/RightPanel/RightVBox"]
-layout_mode = 2
-
-[node name="DeployBtn" type="Button" parent="UI/RightPanel/RightVBox"]
-layout_mode = 2
-text = "Deploy (select round first)"
-disabled = true
 
 [node name="SubmitBtn" type="Button" parent="UI/RightPanel/RightVBox"]
 layout_mode = 2
@@ -125,11 +136,11 @@ custom_minimum_size = Vector2(0, 36)
 text = "Replay Last Turn"
 disabled = true
 
-[node name="ValidationErrors" type="Label" parent="UI/RightPanel/RightVBox"]
+[node name="HintLabel" type="Label" parent="UI/RightPanel/RightVBox"]
 layout_mode = 2
 text = ""
 autowrap_mode = 3
-theme_override_colors/font_color = Color(1.0, 0.4, 0.4, 1)
+theme_override_colors/font_color = Color(1.0, 0.75, 0.3, 1)
 theme_override_font_sizes/font_size = 11
 
 [node name="StatusOverlay" type="PanelContainer" parent="UI"]

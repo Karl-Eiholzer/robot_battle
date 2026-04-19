@@ -6,7 +6,6 @@ class_name HexMap
 # Manages fog of war by dimming/hiding hexes and enemies.
 
 signal hex_clicked(hex: Vector2i)
-signal hex_double_clicked(hex: Vector2i)
 
 # ==================== Constants ====================
 
@@ -35,10 +34,14 @@ var _hex_coords: Dictionary = {}
 var _hex_terrain: Dictionary = {}
 # visible_hexes: set of Vector2i (for fog of war)
 var _visible_hexes: Dictionary = {}
-# highlight_hexes: Dictionary  Vector2i -> Color  (deploy targeting, high priority)
+# highlight_hexes: Dictionary  Vector2i -> Color  (deploy targeting)
 var _highlight_hexes: Dictionary = {}
-# path_highlight_hexes: Dictionary  Vector2i -> Color  (planned move destinations)
+# path_highlight_hexes: Dictionary  Vector2i -> Color  (current-round move destinations)
 var _path_highlight_hexes: Dictionary = {}
+# adjacent_highlight_hexes: Dictionary  Vector2i -> Color  (valid moves for selected robot)
+var _adjacent_highlight_hexes: Dictionary = {}
+# move_arrows: Array of {from: Vector2, to: Vector2, color: Color} for current round
+var _move_arrows: Array = []
 
 # Robot sprite nodes: robot_id -> RobotSprite node
 var _robot_sprites: Dictionary = {}
@@ -46,7 +49,7 @@ var _robot_sprites: Dictionary = {}
 # Currently selected robot id (for highlight)
 var _selected_robot_id: String = ""
 
-# Hex object indicators: position key String "q,r" -> Label/node
+# Hex object indicators: position key String "q,r,type" -> Label/node
 var _hex_object_nodes: Dictionary = {}
 
 # ==================== Init ====================
@@ -73,6 +76,10 @@ func _build_hex_grid() -> void:
 		var coord = Vector2i(q, r)
 		_hex_coords[coord] = true
 		_hex_terrain[coord] = hex_data.get("terrain", "default")
+
+# Returns true if hex exists in the map grid.
+func has_hex(hex: Vector2i) -> bool:
+	return hex in _hex_coords
 
 # Returns the average world position of the player's robots (for camera centering).
 func get_player_robots_centroid() -> Vector2:
@@ -111,6 +118,7 @@ func _add_or_update_robot(robot: Dictionary, is_mine: bool) -> void:
 	if robot_id in _robot_sprites:
 		var existing := _robot_sprites[robot_id] as RobotSprite
 		existing.position = pixel
+		existing.axial_pos = hex
 		existing.set_stunned(robot.get("state", "active") == "stunned")
 		return
 
@@ -138,10 +146,8 @@ func remove_robot(robot_id: String) -> void:
 func get_robot_sprite(robot_id: String) -> Node2D:
 	return _robot_sprites.get(robot_id, null)
 
-# Reset map visuals to the state at the start of a turn so the replay can
-# be watched again from the beginning.  Does NOT change GameState.
+# Reset map visuals to the state at the start of a turn for replay rewatching.
 func reset_for_replay(replay_data: Dictionary) -> void:
-	# Move every sprite back to its round-0 before_position
 	var rounds = replay_data.get("rounds", [])
 	if not rounds.is_empty():
 		for robot_replay in rounds[0]:
@@ -151,12 +157,9 @@ func reset_for_replay(replay_data: Dictionary) -> void:
 			if robot_id in _robot_sprites:
 				_robot_sprites[robot_id].position = HexMath.axial_to_pixel(hex, HEX_SIZE)
 
-	# Undo hex-object changes so the animation recreates them correctly:
-	# remove objects that were created during the turn
 	for obj in replay_data.get("hex_objects_created", []):
 		var pos = obj.get("position", [0, 0])
 		remove_hex_object(int(pos[0]), int(pos[1]), obj.get("type", ""))
-	# restore objects that were destroyed during the turn
 	for obj in replay_data.get("hex_objects_destroyed", []):
 		_add_hex_object_node(obj)
 
@@ -168,6 +171,49 @@ func set_selected_robot(robot_id: String) -> void:
 	_selected_robot_id = robot_id
 	if robot_id != "" and robot_id in _robot_sprites:
 		_robot_sprites[robot_id].set_selected(true)
+
+# ==================== Projected Positions ====================
+
+# Move robot sprites to their projected positions at the start of current_round,
+# and draw move arrows for any planned move in current_round.
+func update_projected_positions(action_plan: Dictionary, current_round: int,
+		robot_lookup: Dictionary) -> void:
+	_path_highlight_hexes.clear()
+	_move_arrows.clear()
+
+	for robot_id in action_plan.keys():
+		var robot = robot_lookup.get(robot_id, {})
+		if robot.is_empty():
+			continue
+
+		# Compute projected position entering this round (after rounds 0..current_round-1)
+		var start_pos = robot.get("position", [0, 0])
+		var proj_pos = start_pos.duplicate()
+		var rounds = action_plan.get(robot_id, [])
+		for i in range(current_round):
+			if i < rounds.size() and rounds[i].get("action_type", "wait") == "move":
+				proj_pos = rounds[i].get("after_position", proj_pos)
+
+		var proj_hex = Vector2i(int(proj_pos[0]), int(proj_pos[1]))
+
+		# Reposition sprite
+		if robot_id in _robot_sprites:
+			_robot_sprites[robot_id].position = HexMath.axial_to_pixel(proj_hex, HEX_SIZE)
+			_robot_sprites[robot_id].axial_pos = proj_hex
+
+		# Build move arrow if this robot has a move in current_round
+		if current_round < rounds.size() and rounds[current_round].get("action_type", "wait") == "move":
+			var dest_arr = rounds[current_round].get("after_position", proj_pos)
+			var dest_hex = Vector2i(int(dest_arr[0]), int(dest_arr[1]))
+			var from_px = HexMath.axial_to_pixel(proj_hex, HEX_SIZE)
+			var to_px = HexMath.axial_to_pixel(dest_hex, HEX_SIZE)
+			var team = robot.get("team", 0)
+			var rtype = robot.get("type", "captain")
+			var color = RobotSprite.TEAM_COLORS.get(team, {}).get(rtype, Color.WHITE)
+			_move_arrows.append({"from": from_px, "to": to_px, "color": Color(color.r, color.g, color.b, 0.9)})
+			_path_highlight_hexes[dest_hex] = Color(color.r, color.g, color.b, 0.35)
+
+	queue_redraw()
 
 # ==================== Hex Object Management ====================
 
@@ -190,12 +236,11 @@ func _add_hex_object_node(obj: Dictionary) -> void:
 	var type = obj.get("type", "")
 	var key = "%d,%d,%s" % [pos[0], pos[1], type]
 	if key in _hex_object_nodes:
-		return  # Already rendered
+		return
 
 	var hex = Vector2i(int(pos[0]), int(pos[1]))
 	var pixel = HexMath.axial_to_pixel(hex, HEX_SIZE)
 
-	# Simple label indicator
 	var label = Label.new()
 	label.text = _obj_label(type)
 	label.position = pixel + Vector2(-8, -8)
@@ -214,6 +259,7 @@ func _obj_label(type: String) -> String:
 
 # ==================== Highlights ====================
 
+# Deploy targeting highlights (purple).
 func highlight_hexes(hexes: Array, color: Color) -> void:
 	_highlight_hexes.clear()
 	for h in hexes:
@@ -224,26 +270,21 @@ func clear_highlights() -> void:
 	_highlight_hexes.clear()
 	queue_redraw()
 
-# ==================== Move Path Highlights ====================
-
-func update_move_path_highlights(action_plan: Dictionary, robot_lookup: Dictionary) -> void:
-	_path_highlight_hexes.clear()
-	for robot_id in action_plan.keys():
-		var robot = robot_lookup.get(robot_id, {})
-		if robot.is_empty():
-			continue
-		var team = robot.get("team", 0)
-		var rtype = robot.get("type", "captain")
-		var base: Color = RobotSprite.TEAM_COLORS.get(team, {}).get(rtype, Color.WHITE)
-		var highlight = Color(base.r, base.g, base.b, 0.5)
-		for round_data in action_plan.get(robot_id, []):
-			if round_data.get("action_type", "wait") == "move":
-				var after = round_data.get("after_position", [0, 0])
-				_path_highlight_hexes[Vector2i(int(after[0]), int(after[1]))] = highlight
+# Adjacent move highlights (green) — valid destinations for the selected robot.
+func highlight_adjacent_hexes(hexes: Array) -> void:
+	_adjacent_highlight_hexes.clear()
+	for h in hexes:
+		_adjacent_highlight_hexes[h] = Color(0.3, 0.9, 0.3, 0.45)
 	queue_redraw()
 
-func clear_move_path_highlights() -> void:
+func clear_adjacent_highlights() -> void:
+	_adjacent_highlight_hexes.clear()
+	queue_redraw()
+
+# Clear planned-move path highlights and arrows (called when entering replay).
+func clear_path_highlights() -> void:
 	_path_highlight_hexes.clear()
+	_move_arrows.clear()
 	queue_redraw()
 
 # ==================== Fog of War ====================
@@ -260,12 +301,9 @@ func _is_visible(hex: Vector2i) -> bool:
 # ==================== Drawing ====================
 
 func _draw() -> void:
-	# Draw hex tiles
 	for coord in _hex_coords.keys():
 		_draw_hex(coord)
 
-	# Draw hex object overlays
-	# (Labels handle their own rendering, but we draw color fill underneath)
 	for obj in GameState.hex_objects:
 		var pos = obj.get("position", [0, 0])
 		var hex = Vector2i(int(pos[0]), int(pos[1]))
@@ -274,12 +312,24 @@ func _draw() -> void:
 		color.a = 0.35
 		draw_circle(pixel, HEX_SIZE * 0.4, color)
 
+	# Draw move arrows on top of hex fills, under robot sprites
+	for arrow in _move_arrows:
+		var f: Vector2 = arrow["from"]
+		var t: Vector2 = arrow["to"]
+		var c: Color = arrow["color"]
+		draw_line(f, t, c, 3.0)
+		# Arrowhead
+		var dir = (t - f).normalized()
+		var perp = Vector2(-dir.y, dir.x)
+		var tip = t - dir * 10.0
+		draw_line(tip, tip + (-dir + perp) * 9.0, c, 2.5)
+		draw_line(tip, tip + (-dir - perp) * 9.0, c, 2.5)
+
 func _draw_hex(coord: Vector2i) -> void:
 	var center = HexMath.axial_to_pixel(coord, HEX_SIZE)
 	var terrain = _hex_terrain.get(coord, "default")
 	var color = TERRAIN_COLORS.get(terrain, TERRAIN_COLORS["default"])
 
-	# Fog of war: dim hexes not visible
 	var is_hex_visible = _is_visible(coord)
 	if not is_hex_visible:
 		color = color.darkened(0.55)
@@ -288,24 +338,27 @@ func _draw_hex(coord: Vector2i) -> void:
 	var points = _hex_corners(center)
 	draw_colored_polygon(points, color)
 
-	# Move path highlight (planned destinations, drawn before deploy highlight)
+	# Adjacent move highlight (green) — drawn first, lowest priority overlay
+	if coord in _adjacent_highlight_hexes:
+		draw_colored_polygon(points, _adjacent_highlight_hexes[coord])
+
+	# Planned move destination (robot color tint) for current round
 	if coord in _path_highlight_hexes:
 		draw_colored_polygon(points, _path_highlight_hexes[coord])
 
-	# Deploy targeting highlight (higher priority, drawn on top)
+	# Deploy targeting highlight — highest priority, drawn on top
 	if coord in _highlight_hexes:
 		var hcolor = _highlight_hexes[coord]
 		hcolor.a = 0.45
 		draw_colored_polygon(points, hcolor)
 
-	# Hex border
 	var border_color = Color(0, 0, 0, 0.25) if is_hex_visible else Color(0, 0, 0, 0.1)
 	draw_polyline(_close_polygon(points), border_color, 1.0)
 
 func _hex_corners(center: Vector2) -> PackedVector2Array:
 	var points = PackedVector2Array()
 	for i in range(6):
-		var angle_deg = 60.0 * i  # flat-top: start at 0
+		var angle_deg = 60.0 * i
 		var angle_rad = deg_to_rad(angle_deg)
 		points.append(center + Vector2(cos(angle_rad), sin(angle_rad)) * HEX_SIZE)
 	return points
@@ -320,14 +373,13 @@ func _close_polygon(points: PackedVector2Array) -> PackedVector2Array:
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
-		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		# Only process the first click of a potential double-click to avoid
+		# duplicate actions (select then immediately clear).
+		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT and not event.double_click:
 			var local_pos = get_local_mouse_position()
 			var hex = HexMath.pixel_to_axial(local_pos, HEX_SIZE)
 			if hex in _hex_coords:
-				if event.double_click:
-					hex_double_clicked.emit(hex)
-				else:
-					hex_clicked.emit(hex)
+				hex_clicked.emit(hex)
 
 # ==================== Cleanup ====================
 
@@ -337,6 +389,8 @@ func _clear_all() -> void:
 	_visible_hexes.clear()
 	_highlight_hexes.clear()
 	_path_highlight_hexes.clear()
+	_adjacent_highlight_hexes.clear()
+	_move_arrows.clear()
 
 	for sprite in _robot_sprites.values():
 		sprite.queue_free()
@@ -350,10 +404,6 @@ func _clear_all() -> void:
 
 func animate_replay_round(round_replays: Array, hex_objects_created: Array,
 		hex_objects_destroyed: Array) -> void:
-	# Animate all robot actions in this round, then update hex objects.
-	# Returns after animations are complete (caller should await).
-	var _tweens: Array = []
-
 	for robot_replay in round_replays:
 		var robot_id = robot_replay.get("robot_id", "")
 		var anim_type = robot_replay.get("animation_type", "Waiting")
@@ -378,9 +428,8 @@ func animate_replay_round(round_replays: Array, hex_objects_created: Array,
 			"Stunned":
 				sprite.show_stunned_flash()
 			"Waiting", "Puzzled":
-				pass  # No movement
+				pass
 
-	# Update hex objects after round animation
 	for obj in hex_objects_created:
 		add_hex_object(obj)
 	for obj in hex_objects_destroyed:
