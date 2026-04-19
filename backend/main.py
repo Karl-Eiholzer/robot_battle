@@ -355,6 +355,17 @@ async def spawn_robots(
             detail="Team 1 has not assigned roles yet"
         )
 
+    # Idempotent: if robots are already spawned return them without re-spawning.
+    # This handles the race where multiple players click Spawn simultaneously.
+    game_meta = redis_client.get_game_meta(game_id)
+    if game_meta and game_meta.get("state") == "in_progress":
+        existing_robots = redis_client.get_robots(game_id)
+        return SpawnRobotsResponse(
+            success=True,
+            robots_created=len(existing_robots),
+            robots=existing_robots
+        )
+
     game_vars = redis_client.get_game_variables(game_id)
     if not game_vars:
         game_vars = GameVariables().model_dump()

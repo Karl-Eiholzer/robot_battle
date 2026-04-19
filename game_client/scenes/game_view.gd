@@ -35,8 +35,6 @@ extends Node2D
 # Six round indicator buttons (R1..R6), created in _ready() and inserted
 # between PrevRoundBtn and NextRoundBtn in the RoundNav bar.
 var _round_nav_btns: Array = []
-
-var _input_time_remaining: float = 0.0
 var _last_replay: Dictionary = {}
 
 # Camera pan state
