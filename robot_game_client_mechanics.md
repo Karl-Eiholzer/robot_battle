@@ -62,10 +62,10 @@ The game view screen is divided into three areas:
 - Zoom In / Zoom Out buttons
 
 **Hex Map (center) — draw the path:**
-- Click one of your robots (or press **Tab**) to select it. The view only pans if the robot is off-screen.
+- Click one of your robots (or press **Tab**) to select it. The view pans only if the robot is off-screen or hidden under a panel.
 - Click an adjacent green hex to add a move; each click fills the **next round**. Click a farther hex to auto-route around obstacles using the moves and rounds left. Left-drag across hexes paints a path one step at a time.
 - A dashed preview shows the route to the hovered hex (green = reachable, red = not).
-- **Space / W** adds a wait for the next round; **Backspace / Ctrl+Z** undoes the last step.
+- **Space** adds a wait for the next round; **Backspace / Ctrl+Z** undoes the last step.
 - Every robot's planned path is drawn: numbered markers show which round a robot arrives on a hex, `w3` marks a wait in round 3, `D4` marks a deploy target for round 4. The selected robot's path is bright, others faded.
 - Right-click a step marker for the step menu; right-drag or middle-drag pans; the scroll wheel zooms.
 
@@ -78,7 +78,32 @@ The game view screen is divided into three areas:
 
 **Edits keep later steps:** steps are stored as directions, so changing an early step shifts the rest of the path along with it. Inserting or deleting a step shifts later rounds. Steps that become illegal (blocked hex, over the move limit, not enough energy, deploy target out of range) turn **red** with the reason shown, rather than being deleted. Submitting with red steps asks for a second press; red steps are sent as waits.
 
+**Timeline Dock size:** the dock sizes itself to its contents in the bottom-left corner. **T** (or the Hide/Show plan button) collapses it so robots underneath can be clicked.
+
 **Deploy:** press **F** or the Deploy button (applies to the cursor round), or use "Deploy here" in the step menu. Purple hexes show valid targets; click one to confirm, or press **Esc** / right-click to cancel. Extra Moves applies immediately.
+
+**Keyboard-only play:** every action has a key.
+
+| Key | Action |
+|---|---|
+| Tab / Shift+Tab | Next / previous robot |
+| Q W E / A S D | Move NW, N, NE / SW, S, SE (next round) |
+| Space | Wait (next round) |
+| Backspace, Ctrl+Z | Undo last step |
+| Shift+Backspace | Clear the selected robot's plan |
+| 1–6 | Aim at a round (next move/wait key writes there) and show the board at that round |
+| 0 or ` | Back to full-path view |
+| X / Delete | Delete the step at the aimed round (later steps move earlier) |
+| I / Insert | Insert a wait at the aimed round (later steps move later) |
+| [ / ] | Move the aimed step one round earlier / later |
+| F | Deploy at the aimed round (press again to clear). While targeting: Q W E A S D move the white target outline, Tab cycles valid targets, Enter / Space / F confirms |
+| M | Open the step menu (arrow keys + Enter to choose) |
+| C | Center camera on the selected robot |
+| Arrow keys, + / − | Pan, zoom |
+| T | Hide / show the plan grid |
+| R | Replay last turn |
+| Enter | Submit turn |
+| Esc | Cancel deploy / close menu / deselect |
 
 **Right Panel:** the selected robot's card (type, moves used, energy, which round the next click sets, any flagged steps), the Deploy button, Submit Turn (**Enter**), Replay Last Turn, hints, and a controls cheat sheet.
 

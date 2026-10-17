@@ -6,6 +6,8 @@ class_name PlanTimeline
 # at that round, drag one cell onto another in the same row to swap their
 # timing, right-click a cell for the step menu. Column headers scrub the
 # board to that round. All edits go through TurnInput.
+# The dock sizes itself to its contents and sits at the bottom-left corner,
+# so it covers as little of the map as possible; it can be collapsed (T).
 
 # Right-click on a cell; game_view owns the context menu.
 signal cell_context_requested(robot_id: String, round_num: int, screen_pos: Vector2)
@@ -13,7 +15,7 @@ signal cell_context_requested(robot_id: String, round_num: int, screen_pos: Vect
 # Compass names for HexMath.AXIAL_DIRECTIONS on the flat-top layout.
 const DIR_NAMES: Array = ["SE", "NE", "N", "NW", "SW", "S"]
 
-const CELL_SIZE := Vector2(48, 30)
+const CELL_SIZE := Vector2(48, 26)
 const COLOR_ISSUE := Color(0.75, 0.15, 0.15)
 const COLOR_MOVE := Color(0.22, 0.32, 0.45)
 const COLOR_WAIT := Color(0.2, 0.2, 0.22)
@@ -22,7 +24,10 @@ const COLOR_CURSOR := Color(1.0, 0.85, 0.2)
 const COLOR_VIEW_COL := Color(0.35, 0.35, 0.15)
 
 var _grid: GridContainer
+var _hint_label: Label
+var _toggle_btn: Button
 var _rebuild_queued: bool = false
+var collapsed: bool = false
 
 # ==================== Cell ====================
 
@@ -60,11 +65,20 @@ func _ready() -> void:
 	var vbox = VBoxContainer.new()
 	add_child(vbox)
 
-	var title = Label.new()
-	title.text = "Plan — click a cell to aim at a round · drag cells to retime · right-click for options"
-	title.add_theme_font_size_override("font_size", 11)
-	title.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
-	vbox.add_child(title)
+	var title_row = HBoxContainer.new()
+	vbox.add_child(title_row)
+
+	_toggle_btn = _make_button("")
+	_toggle_btn.custom_minimum_size = Vector2(0, 22)
+	_toggle_btn.tooltip_text = "Hide or show the plan grid (T)"
+	_toggle_btn.pressed.connect(toggle_collapsed)
+	title_row.add_child(_toggle_btn)
+
+	_hint_label = Label.new()
+	_hint_label.text = "click a cell to aim at a round · drag cells to retime · right-click for options"
+	_hint_label.add_theme_font_size_override("font_size", 11)
+	_hint_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	title_row.add_child(_hint_label)
 
 	_grid = GridContainer.new()
 	_grid.columns = 1 + TurnInput.ROUNDS_PER_TURN + 2
@@ -77,7 +91,24 @@ func _ready() -> void:
 	TurnInput.view_round_changed.connect(func(_r): queue_rebuild())
 	TurnInput.phase_changed.connect(func(_p): queue_rebuild())
 	GameState.robots_updated.connect(queue_rebuild)
+	get_viewport().size_changed.connect(fit_to_content)
+	_apply_collapsed()
 	_rebuild()
+
+func toggle_collapsed() -> void:
+	collapsed = not collapsed
+	_apply_collapsed()
+
+func _apply_collapsed() -> void:
+	_grid.visible = not collapsed
+	_hint_label.visible = not collapsed
+	_toggle_btn.text = "Show plan" if collapsed else "Hide plan"
+	fit_to_content.call_deferred()
+
+# Shrink to the grid's natural size, pinned to the bottom-left corner.
+func fit_to_content() -> void:
+	size = get_combined_minimum_size()
+	position = Vector2(0, get_viewport_rect().size.y - size.y)
 
 # Rebuilds are deferred so a cell is never freed inside its own press handler,
 # and several plan changes in one frame cost one rebuild.
@@ -91,6 +122,7 @@ func _rebuild() -> void:
 	_rebuild_queued = false
 	if _grid == null:
 		return
+	fit_to_content.call_deferred()
 	for child in _grid.get_children():
 		_grid.remove_child(child)
 		child.queue_free()
@@ -178,9 +210,7 @@ func _add_robot_row(robot_id: String, robot: Dictionary, row_name: String, edita
 	_grid.add_child(energy_label)
 
 func _style_cell(cell: Button, bg: Color, show_cursor: bool, row_selected: bool) -> void:
-	var normal = StyleBoxFlat.new()
-	normal.bg_color = bg if row_selected else bg.darkened(0.25)
-	normal.set_corner_radius_all(3)
+	var normal = _compact_style(bg if row_selected else bg.darkened(0.25))
 	if show_cursor:
 		normal.border_color = COLOR_CURSOR
 		normal.set_border_width_all(2)
@@ -189,7 +219,18 @@ func _style_cell(cell: Button, bg: Color, show_cursor: bool, row_selected: bool)
 	cell.add_theme_stylebox_override("normal", normal)
 	cell.add_theme_stylebox_override("hover", hover)
 	cell.add_theme_stylebox_override("pressed", hover)
+	cell.add_theme_stylebox_override("hover_pressed", hover)
 	cell.add_theme_stylebox_override("disabled", normal)
+
+# Flat box with small padding; the default theme's padding makes rows ~45% taller.
+func _compact_style(bg: Color) -> StyleBoxFlat:
+	var box = StyleBoxFlat.new()
+	box.bg_color = bg
+	box.set_corner_radius_all(3)
+	box.set_content_margin_all(2)
+	box.content_margin_left = 6
+	box.content_margin_right = 6
+	return box
 
 func _make_button(text: String) -> Button:
 	var btn = Button.new()
@@ -197,6 +238,14 @@ func _make_button(text: String) -> Button:
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.custom_minimum_size = CELL_SIZE
 	btn.add_theme_font_size_override("font_size", 12)
+	var normal = _compact_style(Color(0.25, 0.25, 0.28))
+	var hover = _compact_style(Color(0.33, 0.33, 0.37))
+	var pressed = _compact_style(Color(0.35, 0.42, 0.6))
+	btn.add_theme_stylebox_override("normal", normal)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_stylebox_override("hover_pressed", pressed)
+	btn.add_theme_stylebox_override("disabled", normal)
 	return btn
 
 func _make_label(text: String) -> Label:

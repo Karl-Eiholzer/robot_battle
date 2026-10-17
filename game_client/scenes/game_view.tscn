@@ -63,15 +63,6 @@ text = "-"
 tooltip_text = "Zoom Out (scroll down)"
 
 [node name="Timeline" type="PanelContainer" parent="UI"]
-layout_mode = 1
-anchors_preset = 12
-anchor_left = 0.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_top = -230
-offset_right = -260
-grow_vertical = 0
 script = ExtResource("3")
 
 [node name="RightPanel" type="PanelContainer" parent="UI"]
@@ -129,19 +120,23 @@ layout_mode = 2
 
 [node name="ControlsLabel" type="Label" parent="UI/RightPanel/RightVBox"]
 layout_mode = 2
-text = "CONTROLS
-Click robot: select
-Click hex: next step (far hex = auto-route)
-Drag: paint a path
-Space / W: wait this round
-Backspace / Ctrl+Z: undo step
-1-6: aim at round
-F: deploy at aimed round
-Tab: next robot
-Right-click step: options
-Esc: cancel / deselect
-Enter: submit
-Right-drag / middle-drag: pan"
+text = "MOUSE
+Click robot: select · Click hex: step (far = auto-route)
+Drag: paint path · Right-click step: options
+Right/middle-drag: pan · Wheel: zoom
+
+KEYBOARD
+Tab / Shift+Tab: next / prev robot
+Q W E / A S D: move NW N NE / SW S SE
+Space: wait · Backspace: undo step
+1-6: aim at round · 0: full-path view
+X / Del: delete step · I: insert wait
+[ / ]: move step a round earlier / later
+F: deploy (QWEASD/Tab aim, Enter confirm)
+M: step menu · Shift+Backspace: clear robot
+C: center robot · Arrows: pan · +/-: zoom
+T: hide plan grid · R: replay · Enter: submit
+Esc: cancel / deselect"
 theme_override_colors/font_color = Color(0.65, 0.65, 0.65, 1)
 theme_override_font_sizes/font_size = 11
 

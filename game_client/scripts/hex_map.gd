@@ -52,6 +52,10 @@ var _plan_paths: Array = []
 var _hover_points: PackedVector2Array = PackedVector2Array()
 var _hover_valid: bool = true
 
+# Keyboard-chosen deploy target, outlined in white (when _has_focus_hex).
+var _focus_hex: Vector2i = Vector2i.ZERO
+var _has_focus_hex: bool = false
+
 # Mouse tracking for hover/drag/right-click detection
 var _last_hover_hex: Vector2i = Vector2i(-9999, -9999)
 var _right_press_pos: Vector2 = Vector2.ZERO
@@ -320,6 +324,12 @@ func highlight_hexes(hexes: Array, color: Color) -> void:
 
 func clear_highlights() -> void:
 	_highlight_hexes.clear()
+	_has_focus_hex = false
+	queue_redraw()
+
+func set_focus_hex(hex: Vector2i) -> void:
+	_focus_hex = hex
+	_has_focus_hex = true
 	queue_redraw()
 
 # Adjacent move highlights (green) — valid destinations for the selected robot.
@@ -404,6 +414,10 @@ func _draw_plan_paths() -> void:
 			draw_circle(center, HEX_SIZE * 0.3, Color(0.8, 0.4, 1.0, 0.6 * alpha))
 			draw_string(font, center + Vector2(-HEX_SIZE * 0.5, 5), deploy["label"],
 				HORIZONTAL_ALIGNMENT_CENTER, HEX_SIZE, 13, Color(1, 1, 1, alpha))
+
+	if _has_focus_hex:
+		var fc = HexMath.axial_to_pixel(_focus_hex, HEX_SIZE)
+		draw_polyline(_close_polygon(_hex_corners(fc)), Color.WHITE, 4.0)
 
 	# Hover preview, dashed
 	if _hover_points.size() > 1:

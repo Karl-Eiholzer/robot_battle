@@ -38,6 +38,9 @@ var _step_menu: PopupMenu
 var _menu_robot_id: String = ""
 var _menu_round: int = -1
 
+# Keyboard-chosen deploy target during DEPLOY_TARGETING.
+var _deploy_focus: Vector2i = Vector2i.ZERO
+
 # Set when Submit was pressed with flagged steps; a second press confirms.
 var _confirm_submit: bool = false
 
@@ -85,7 +88,8 @@ func _ready() -> void:
 	# Populate map first, then start input phase (which resets plans and
 	# triggers _refresh_plan_view while sprites are ready).
 	hex_map.populate_from_game_state()
-	camera.position = hex_map.get_player_robots_centroid()
+	timeline.fit_to_content()
+	_center_camera_on(hex_map.get_player_robots_centroid())
 	_update_header()
 	TurnInput.start_input_phase()
 
@@ -150,53 +154,180 @@ func _on_zoom_out() -> void:
 func _apply_zoom(factor: float) -> void:
 	camera.zoom = (camera.zoom * factor).clamp(Vector2(0.2, 0.2), Vector2(5.0, 5.0))
 
-# Pan only when the hex is off-screen, so selecting never yanks the view.
+# Screen area of the map not covered by the top bar, right panel or plan grid.
+func _map_safe_screen_rect() -> Rect2:
+	var vp = get_viewport_rect().size
+	var top = $UI/TopBar.size.y
+	var right = vp.x - $UI/RightPanel.size.x
+	var bottom = vp.y
+	if timeline.visible:
+		bottom = timeline.position.y
+	return Rect2(0, top, right, maxf(bottom - top, 1.0))
+
+func _world_to_screen(world: Vector2) -> Vector2:
+	return (world - camera.position) * camera.zoom + get_viewport_rect().size * 0.5
+
+# Center a world point within the uncovered map area.
+func _center_camera_on(world: Vector2) -> void:
+	var offset = _map_safe_screen_rect().get_center() - get_viewport_rect().size * 0.5
+	camera.position = world - offset / camera.zoom
+
+# Pan only when the hex is hidden under a panel or off-screen, so selecting
+# never yanks the view needlessly.
 func _ensure_hex_visible(hex: Vector2i) -> void:
 	var world = HexMath.axial_to_pixel(hex, HexMath.HEX_SIZE)
-	var half = get_viewport_rect().size / camera.zoom * 0.5
-	var view = Rect2(camera.position - half, half * 2.0).grow(-HexMath.HEX_SIZE * 2.0)
-	if not view.has_point(world):
-		camera.position = world
+	var safe = _map_safe_screen_rect().grow(-HexMath.HEX_SIZE * camera.zoom.x)
+	if not safe.has_point(_world_to_screen(world)):
+		_center_camera_on(world)
 
 # ==================== Keyboard ====================
 
+# Q W E / A S D -> hex direction index (HexMath.AXIAL_DIRECTIONS, flat-top):
+#  NW N NE / SW S SE
+const MOVE_KEYS: Dictionary = {
+	KEY_Q: 3, KEY_W: 2, KEY_E: 1,
+	KEY_A: 4, KEY_S: 5, KEY_D: 0,
+}
+const PAN_KEYS: Dictionary = {
+	KEY_LEFT: Vector2.LEFT, KEY_RIGHT: Vector2.RIGHT,
+	KEY_UP: Vector2.UP, KEY_DOWN: Vector2.DOWN,
+}
+
 func _handle_key(event: InputEventKey) -> void:
-	if event.keycode == KEY_ESCAPE:
-		_on_cancel()
-		get_viewport().set_input_as_handled()
-		return
-	if TurnInput.current_phase != TurnInput.Phase.INPUT:
-		return
-	var robot_id = TurnInput.selected_robot_id
+	var key = event.keycode
+	var modified = event.ctrl_pressed or event.meta_pressed or event.alt_pressed
 	var handled = true
-	match event.keycode:
-		KEY_TAB:
-			_cycle_robot(-1 if event.shift_pressed else 1)
-		KEY_ENTER, KEY_KP_ENTER:
-			_on_submit_pressed()
-		KEY_SPACE, KEY_W:
-			if robot_id != "" and not TurnInput.add_wait_at_cursor(robot_id):
-				hint_label.text = "All 6 rounds are planned. Click a cell to edit a round."
-		KEY_BACKSPACE:
-			if robot_id != "":
-				TurnInput.undo_last(robot_id)
-		KEY_Z:
-			if event.ctrl_pressed or event.meta_pressed:
-				if robot_id != "":
-					TurnInput.undo_last(robot_id)
-			else:
-				handled = false
-		KEY_F:
-			_on_deploy_pressed()
-		KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6:
-			if robot_id != "":
-				var r = event.keycode - KEY_1
-				TurnInput.set_cursor(robot_id, r)
-				TurnInput.set_view_round(r)
-		_:
-			handled = false
+
+	# Keys that work in every phase
+	if key == KEY_ESCAPE:
+		_on_cancel()
+	elif key in PAN_KEYS:
+		camera.position += PAN_KEYS[key] * 96.0 / camera.zoom.x
+	elif key == KEY_EQUAL or key == KEY_PLUS or key == KEY_KP_ADD:
+		_on_zoom_in()
+	elif key == KEY_MINUS or key == KEY_KP_SUBTRACT:
+		_on_zoom_out()
+	elif key == KEY_T:
+		timeline.toggle_collapsed()
+	elif key == KEY_R and not replay_btn.disabled:
+		_replay_last_turn()
+	elif TurnInput.current_phase == TurnInput.Phase.DEPLOY_TARGETING:
+		handled = _handle_deploy_key(event)
+	elif TurnInput.current_phase == TurnInput.Phase.INPUT and (not modified or key == KEY_Z):
+		handled = _handle_plan_key(event)
+	else:
+		handled = false
+
 	if handled:
 		get_viewport().set_input_as_handled()
+
+# Planning keys (INPUT phase). Returns true if the key was used.
+func _handle_plan_key(event: InputEventKey) -> bool:
+	var key = event.keycode
+	var robot_id = TurnInput.selected_robot_id
+
+	match key:
+		KEY_TAB:
+			_cycle_robot(-1 if event.shift_pressed else 1)
+			return true
+		KEY_ENTER, KEY_KP_ENTER:
+			_on_submit_pressed()
+			return true
+		KEY_0, KEY_QUOTELEFT:
+			TurnInput.set_view_round(-1)
+			return true
+	if robot_id == "":
+		if key in MOVE_KEYS or key in [KEY_SPACE, KEY_F, KEY_C, KEY_M]:
+			hint_label.text = "Select a robot first (Tab)."
+			return true
+		return false
+
+	var r = TurnInput.get_cursor(robot_id)
+	if key in MOVE_KEYS:
+		if r >= TurnInput.ROUNDS_PER_TURN:
+			hint_label.text = "All 6 rounds planned. Press 1-6 to edit a round."
+		else:
+			var from_hex = TurnInput.get_projected_hex(robot_id, r - 1)
+			_try_step_to(robot_id, from_hex + HexMath.AXIAL_DIRECTIONS[MOVE_KEYS[key]])
+		return true
+
+	match key:
+		KEY_SPACE:
+			if not TurnInput.add_wait_at_cursor(robot_id):
+				hint_label.text = "All 6 rounds planned. Press 1-6 to edit a round."
+		KEY_BACKSPACE:
+			if event.shift_pressed:
+				TurnInput.clear_robot(robot_id)
+			else:
+				TurnInput.undo_last(robot_id)
+		KEY_Z:
+			if not (event.ctrl_pressed or event.meta_pressed):
+				return false
+			TurnInput.undo_last(robot_id)
+		KEY_DELETE, KEY_X:
+			if r < TurnInput.get_steps(robot_id).size():
+				TurnInput.delete_step(robot_id, r)
+			else:
+				hint_label.text = "No step at round %d to delete (Backspace undoes the last step)." % mini(r + 1, 6)
+		KEY_I, KEY_INSERT:
+			if not TurnInput.insert_wait(robot_id, mini(r, TurnInput.ROUNDS_PER_TURN - 1)):
+				hint_label.text = "Round 6 already has a move or deploy — no room to shift."
+		KEY_BRACKETLEFT, KEY_BRACKETRIGHT:
+			_shift_step_timing(robot_id, -1 if key == KEY_BRACKETLEFT else 1)
+		KEY_F:
+			_on_deploy_pressed()
+		KEY_C:
+			_center_camera_on(HexMath.axial_to_pixel(
+				TurnInput.get_projected_hex(robot_id, r - 1), HexMath.HEX_SIZE))
+		KEY_M, KEY_MENU:
+			var rr = mini(r, TurnInput.ROUNDS_PER_TURN - 1)
+			var screen = _world_to_screen(HexMath.axial_to_pixel(
+				TurnInput.get_projected_hex(robot_id, rr - 1), HexMath.HEX_SIZE))
+			_open_step_menu(robot_id, rr, screen)
+		KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6:
+			var round_num = key - KEY_1
+			TurnInput.set_cursor(robot_id, round_num)
+			TurnInput.set_view_round(round_num)
+		_:
+			return false
+	return true
+
+# [ / ] : move the step at the cursor one round earlier/later (swap with its
+# neighbour) and keep the cursor on it.
+func _shift_step_timing(robot_id: String, direction: int) -> void:
+	var r = TurnInput.get_cursor(robot_id)
+	if r >= TurnInput.ROUNDS_PER_TURN:
+		r = TurnInput.get_steps(robot_id).size() - 1  # at the end: act on the last step
+	var target = r + direction
+	if r < 0 or target < 0 or target >= TurnInput.ROUNDS_PER_TURN:
+		return
+	TurnInput.swap_steps(robot_id, r, target)
+	TurnInput.set_cursor(robot_id, target)
+	TurnInput.set_view_round(target)
+
+# Deploy targeting keys: Q/W/E/A/S/D move the target, Tab cycles through valid
+# targets, Enter / Space / F confirms.
+func _handle_deploy_key(event: InputEventKey) -> bool:
+	var key = event.keycode
+	var robot_id = TurnInput.deploy_target_robot_id
+	var from_hex = TurnInput.get_projected_hex(robot_id, TurnInput.deploy_round - 1)
+	var targets = TurnInput.get_valid_deploy_targets(robot_id, from_hex)
+	if key in MOVE_KEYS:
+		_set_deploy_focus(_deploy_focus + HexMath.AXIAL_DIRECTIONS[MOVE_KEYS[key]])
+	elif key == KEY_TAB:
+		var idx = targets.find(_deploy_focus)
+		idx = posmod(idx + (-1 if event.shift_pressed else 1), targets.size())
+		_set_deploy_focus(targets[idx])
+	elif key in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE, KEY_F]:
+		_handle_deploy_target(_deploy_focus)
+	else:
+		return false
+	return true
+
+func _set_deploy_focus(hex: Vector2i) -> void:
+	_deploy_focus = hex
+	hex_map.set_focus_hex(hex)
+	_ensure_hex_visible(hex)
 
 func _cycle_robot(direction: int) -> void:
 	var ids = TurnInput.get_my_robot_ids()
@@ -291,7 +422,7 @@ func _update_robot_card() -> void:
 	if r >= TurnInput.ROUNDS_PER_TURN:
 		lines.append("All 6 rounds planned.")
 	else:
-		lines.append("Next click sets round %d." % (r + 1))
+		lines.append("Next click / move key sets round %d." % (r + 1))
 	var issues = TurnInput.get_step_issues(robot_id)
 	for round_num in issues.keys():
 		lines.append("! R%d: %s" % [round_num + 1, issues[round_num]])
@@ -365,9 +496,11 @@ func _start_deploy(robot_id: String, round_num: int) -> void:
 		return
 
 	TurnInput.set_view_round(round_num)
-	hex_map.highlight_hexes(TurnInput.get_valid_deploy_targets(robot_id, from_hex), Color(0.8, 0.4, 1.0, 0.6))
+	var targets = TurnInput.get_valid_deploy_targets(robot_id, from_hex)
+	hex_map.highlight_hexes(targets, Color(0.8, 0.4, 1.0, 0.6))
 	TurnInput.start_deploy_targeting(robot_id, round_num)
-	hint_label.text = "R%d: click a purple hex to deploy %s. Esc or right-click cancels." % [
+	_set_deploy_focus(targets[0])
+	hint_label.text = "R%d: click a purple hex to deploy %s, or move the white outline with QWEASD / Tab and press Enter. Esc cancels." % [
 		round_num + 1, deploy_type_local]
 
 # ==================== Hex Input ====================
@@ -675,7 +808,7 @@ func _replay_last_turn() -> void:
 func _start_next_turn() -> void:
 	hex_map.populate_from_game_state()
 	hex_map.set_selected_robot("")
-	camera.position = hex_map.get_player_robots_centroid()
+	_center_camera_on(hex_map.get_player_robots_centroid())
 	_update_header()
 	hint_label.text = ""
 	TurnInput.start_input_phase()  # resets plans, emits view_round_changed → _refresh_plan_view()
