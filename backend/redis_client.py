@@ -77,6 +77,14 @@ class RedisClient:
         self.client.hset(key, "state", state)
         self._refresh_game_ttl(game_id)
 
+    def acquire_spawn_lock(self, game_id: str, timeout_seconds: int = 30) -> bool:
+        """Atomically claim the right to spawn robots for a game.
+        Kept outside the game:{id}:* namespace so TTL refreshes never extend it."""
+        return bool(self.client.set(f"spawn_lock:{game_id}", "1", nx=True, ex=timeout_seconds))
+
+    def release_spawn_lock(self, game_id: str):
+        self.client.delete(f"spawn_lock:{game_id}")
+
     def increment_turn(self, game_id: str) -> int:
         """Increment current turn and return new turn number"""
         key = f"game:{game_id}:meta"

@@ -356,45 +356,61 @@ async def spawn_robots(
         )
 
     # Idempotent: if robots are already spawned return them without re-spawning.
-    # This handles the race where multiple players click Spawn simultaneously.
-    game_meta = redis_client.get_game_meta(game_id)
-    if game_meta and game_meta.get("state") == "in_progress":
-        existing_robots = redis_client.get_robots(game_id)
+    # (Game state can't be used for this: joining a full game already sets
+    # "in_progress" before anyone spawns.)
+    existing_robots = redis_client.get_robots(game_id)
+    if existing_robots:
         return SpawnRobotsResponse(
             success=True,
             robots_created=len(existing_robots),
             robots=existing_robots
         )
 
-    game_vars = redis_client.get_game_variables(game_id)
-    if not game_vars:
-        game_vars = GameVariables().model_dump()
-
-    map_data = redis_client.get_game_map(game_id)
-    if not map_data:
+    # Only one request may spawn; concurrent ones wait for its robots.
+    if not redis_client.acquire_spawn_lock(game_id):
+        for _ in range(20):
+            await asyncio.sleep(0.25)
+            existing_robots = redis_client.get_robots(game_id)
+            if existing_robots:
+                return SpawnRobotsResponse(
+                    success=True,
+                    robots_created=len(existing_robots),
+                    robots=existing_robots
+                )
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Map data not found"
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Robot spawn already in progress - try again"
         )
 
-    # Mark in_progress BEFORE spawning so concurrent idempotency check catches
-    # simultaneous requests before they each try to spawn robots.
-    redis_client.update_game_state(game_id, "in_progress")
+    try:
+        game_vars = redis_client.get_game_variables(game_id)
+        if not game_vars:
+            game_vars = GameVariables().model_dump()
 
-    robots = spawn_robots_for_game(game_id, game_vars, map_data)
+        map_data = redis_client.get_game_map(game_id)
+        if not map_data:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Map data not found"
+            )
 
-    if not robots:
-        redis_client.update_game_state(game_id, "lobby")  # rollback
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to spawn robots - check role assignments"
-        )
+        robots = spawn_robots_for_game(game_id, game_vars, map_data)
 
-    # Store robots
-    redis_client.store_robots(game_id, robots)
+        if not robots:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to spawn robots - check role assignments"
+            )
 
-    # Initialize hex objects (empty at start)
-    redis_client.store_hex_objects(game_id, [])
+        # Store robots
+        redis_client.store_robots(game_id, robots)
+
+        # Initialize hex objects (empty at start)
+        redis_client.store_hex_objects(game_id, [])
+
+        redis_client.update_game_state(game_id, "in_progress")
+    finally:
+        redis_client.release_spawn_lock(game_id)
 
     return SpawnRobotsResponse(
         success=True,
