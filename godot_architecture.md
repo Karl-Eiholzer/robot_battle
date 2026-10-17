@@ -221,54 +221,77 @@ const ROBOT_STATS: Dictionary = {
 
 ### Action Plan
 
+Plans are stored as **relative steps** so editing an early step translates the
+rest of the path instead of invalidating it. Illegal steps are flagged, not deleted.
+
 ```gdscript
-# action_plan: Dictionary  robot_id -> Array[6 Dictionaries]
-# Each round dict:
-{
-    "action_type": "move" or "wait",
-    "before_position": [q, r],
-    "after_position": [q, r],   # Same as before if action_type == "wait"
-    "deploy": null or {"type": "emp", "target_hexes": [[q, r], ...]}
-}
+# plans: Dictionary  robot_id -> {"steps": Array, "deploys": Dictionary}
+# steps (up to 6; rounds past the end are implicit waits):
+{"type": "move", "dir": 0..5}   # index into HexMath.AXIAL_DIRECTIONS
+{"type": "wait"}
+# deploys: round_idx -> {"type": "emp", "offset": Vector2i}
+#   target = robot's position at start of that round + offset
+
+# cursor_round: robot_id -> round the next map click writes to
+# view_round: round the board is scrubbed to (-1 = turn start + full paths)
 ```
 
 ### Key Methods
 
 ```gdscript
-func start_input_phase() -> void
-# Initializes action_plan for all player_robots (all rounds default to wait)
-# Sets phase to INPUT
+func start_input_phase() -> void          # empty plans for this player's robots, phase INPUT
 
-func set_round_action(robot_id, round_num, action_type, before_pos, after_pos) -> void
-func count_moves_planned(robot_id: String) -> int
-func get_max_moves(robot_id: String) -> int   # base + extra_moves_this_turn
+# Queries
+func get_step(robot_id, round_num) -> Dictionary
+func get_projected_hex(robot_id, after_round) -> Vector2i   # -1 = turn start
+func get_path_tip(robot_id) -> Vector2i
+func get_step_issues(robot_id) -> Dictionary  # round -> reason (blocked hex, over move limit,
+                                              # no energy, deploy target out of range)
+func find_route(robot_id, dest_hex) -> Array  # BFS over passable hexes within remaining budget
+func count_moves_planned(robot_id) -> int
+func get_max_moves(robot_id) -> int           # base + extra_moves_this_turn (0 if stunned)
 
-func start_deploy_targeting(robot_id: String, round_num: int) -> void
-func confirm_deploy_target(target_hexes: Array) -> void
-func cancel_deploy_targeting() -> void
+# Editing (each emits action_plan_changed)
+func add_move_at_cursor(robot_id, dest_hex) -> bool
+func add_route_at_cursor(robot_id, route) -> bool
+func add_wait_at_cursor(robot_id) -> bool
+func set_wait(robot_id, round_num)
+func insert_wait(robot_id, round_num) -> bool  # shifts later steps; refused if R6 is a move/deploy
+func delete_step(robot_id, round_num)          # pulls later steps earlier
+func swap_steps(robot_id, a, b)                # retime a move
+func undo_last(robot_id)
+func clear_robot(robot_id)
+func set_deploy(robot_id, round_num, target_hex) / clear_deploy(robot_id, round_num)
 
-func get_valid_deploy_targets(robot_id: String) -> Array
-# Returns Array of Vector2i based on deploy type:
-#   emp:         rings at distance 4, 5, 6
-#   firewall:    ring at distance 4
-#   supply_drop: adjacent hexes (distance 1)
-#   extra_moves: self hex only (no targeting UI needed)
+func start_deploy_targeting(robot_id, round_num) / confirm_deploy_target(hex) / cancel_deploy_targeting()
+func get_valid_deploy_targets(robot_id, from_hex) -> Array
+#   emp: rings 4-6, firewall: ring 4, supply_drop: adjacent, extra_moves: self
 
 func build_submit_payload() -> Array
-# Returns Array of RoundAction dicts for all robots, all 6 rounds
-# Passed directly to APIClient.submit_actions()
+# 6 chained RoundAction dicts per robot (same format as before). Each step is
+# re-checked from the actual chained position: illegal moves go out as waits,
+# illegal deploys are dropped — so a timeout auto-submit never fails validation.
 
-func validate_plan() -> Array
-# Returns Array of error strings (empty = valid)
+func validate_plan() -> Array   # human-readable list of flagged steps
 ```
 
 ### Signals
 
 ```gdscript
 signal phase_changed(new_phase: Phase)
+signal view_round_changed(round_num: int)
 signal robot_selected(robot_id: String)
 signal action_plan_changed()
 ```
+
+### Input UI
+
+- `scripts/hex_map.gd` draws every own robot's path (numbered round markers, `wN` wait
+  badges, `DN` deploy markers, red outline on flagged steps), a dashed hover-route
+  preview, and emits `hex_clicked`, `hex_hovered`, `hex_drag_entered`, `hex_right_clicked`
+  from `_unhandled_input` (so UI clicks never fall through to the map).
+- `scenes/plan_timeline.gd` (`PlanTimeline`) is the bottom dock: robots x rounds grid,
+  drag-and-drop swaps within a row, right-click requests the step menu from `game_view.gd`.
 
 ---
 

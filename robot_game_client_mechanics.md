@@ -25,8 +25,8 @@ Players are trying to keep their Captain from being captured while simultaneousl
 
 Teams alternate having the "Initiative".
 
-1. **Action Entry** Using Godot game client, all players plan their robots' actions round by round. The player works through all 6 rounds, assigning moves and deploys to each robot per round, before time runs out.
-2. **Action Review** Player can step freely forward and backward through the 6 rounds to review and edit any robot's planned actions at any time before submitting.
+1. **Action Entry** Using Godot game client, all players plan their robots' actions by drawing each robot's path on the map (each step fills the next round) and fine-tuning timing in the timeline dock, before time runs out.
+2. **Action Review** Player can review every robot's 6 rounds in the timeline dock, scrub the board to any round, and edit any step at any time before submitting.
 3. **Submit and Transmit** Players click on "Submit Moves" button and the Godot game client sends the actions to the backend processor via API.
 4. **Wait for Results** Upon receipt of moves from all players, the backend processor combines the moves together, generates results, and makes results available for players to download.
 5. **Replay** Godot game client shows a replay of what happened during the turn, including the actions of any Robots controlled by other players that are in sight. A "Replay Last Turn" button allows the player to re-watch the replay any number of times before the next turn begins.
@@ -61,28 +61,26 @@ The game view screen is divided into three areas:
 - Countdown timer showing seconds remaining to submit
 - Zoom In / Zoom Out buttons
 
-**Round Navigation Bar (below top bar, to the left of the right panel):**
-- **"< Prev"** and **"Next >"** buttons step through rounds one at a time
-- **R1 through R6** clickable buttons jump directly to any round; the active round is highlighted
-- Disabled during replay and while waiting for results
+**Hex Map (center) — draw the path:**
+- Click one of your robots (or press **Tab**) to select it. The view only pans if the robot is off-screen.
+- Click an adjacent green hex to add a move; each click fills the **next round**. Click a farther hex to auto-route around obstacles using the moves and rounds left. Left-drag across hexes paints a path one step at a time.
+- A dashed preview shows the route to the hovered hex (green = reachable, red = not).
+- **Space / W** adds a wait for the next round; **Backspace / Ctrl+Z** undoes the last step.
+- Every robot's planned path is drawn: numbered markers show which round a robot arrives on a hex, `w3` marks a wait in round 3, `D4` marks a deploy target for round 4. The selected robot's path is bright, others faded.
+- Right-click a step marker for the step menu; right-drag or middle-drag pans; the scroll wheel zooms.
 
-**Right Panel:**
-- Current round label ("Round N of 6")
-- Robot status list: one button per robot showing type, current round's action (move destination or "wait"), energy, and move count used/max. Click a robot in the list to select or deselect it.
-- Deploy button: shows the deploy type for the selected robot. Activates deploy-targeting mode (or clears a deploy already set for this round if clicked again). Disabled when no robot is selected or the robot has zero energy.
-- Submit Turn button
-- Replay Last Turn button (enabled after the first replay completes)
-- Hint label: context-sensitive instructions (e.g. "Click a green hex to move")
+**Timeline Dock (bottom):** one row per robot, six round columns, plus moves used/max and energy.
+- Cells show the move direction (N, NE, SE, S, SW, NW), `wait`, or `·` for an unplanned round; `+D` marks a deploy. The cursor cell (where the next map click writes) is outlined in yellow.
+- Click a row name to select that robot. Click a cell (or press **1–6**) to aim the next map click at that round, which also shows the board at the start of that round.
+- Drag a cell onto another cell in the same row to swap their timing.
+- Right-click a cell: Wait this round / Insert wait before / Delete step / Deploy here / Clear deploy / Clear this robot's plan.
+- Click a column header (R1–R6) to see where every robot will be at the start of that round; click it again to return to the full-path view.
 
-**Hex Map (center):**
-- Robots are displayed at their **projected positions** for the current round — where each robot will be if all its planned moves up through the previous round succeed. This lets the player see the board state at each step while planning.
-- **Planned move arrows** are drawn on the map showing each robot's intended destination for the current round.
-- **Single-click** a robot sprite on the map to select it. Selecting a robot highlights its valid adjacent destination hexes in green.
-- Single-click a highlighted green hex to assign a move to the selected robot for the current round.
-- Single-clicking the selected robot's hex again clears its move for the current round (reverting it to "wait").
-- Single-clicking anywhere outside a green hex or robot deselects the current robot.
-- **Cascade clearing**: changing a robot's move in an earlier round automatically clears all of that robot's moves and deploys in later rounds, since their starting positions would no longer be valid.
-- Scroll wheel zooms; middle-mouse or right-mouse drag pans the map.
+**Edits keep later steps:** steps are stored as directions, so changing an early step shifts the rest of the path along with it. Inserting or deleting a step shifts later rounds. Steps that become illegal (blocked hex, over the move limit, not enough energy, deploy target out of range) turn **red** with the reason shown, rather than being deleted. Submitting with red steps asks for a second press; red steps are sent as waits.
+
+**Deploy:** press **F** or the Deploy button (applies to the cursor round), or use "Deploy here" in the step menu. Purple hexes show valid targets; click one to confirm, or press **Esc** / right-click to cancel. Extra Moves applies immediately.
+
+**Right Panel:** the selected robot's card (type, moves used, energy, which round the next click sets, any flagged steps), the Deploy button, Submit Turn (**Enter**), Replay Last Turn, hints, and a controls cheat sheet.
 
 ### Player Timeout
 

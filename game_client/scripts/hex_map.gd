@@ -1,11 +1,16 @@
 extends Node2D
 class_name HexMap
 
-# Renders the hex grid, hex objects, and robots.
-# Handles mouse click input and emits hex_clicked signal.
+# Renders the hex grid, hex objects, robots, and planned robot paths.
+# Emits hex input signals (click, hover, drag, right-click) for game_view.
 # Manages fog of war by dimming/hiding hexes and enemies.
 
 signal hex_clicked(hex: Vector2i)
+signal hex_hovered(hex: Vector2i)
+# Left button held while the mouse enters a new hex (path painting).
+signal hex_drag_entered(hex: Vector2i)
+# Right press+release without dragging (dragging pans the camera).
+signal hex_right_clicked(hex: Vector2i, screen_pos: Vector2)
 
 # ==================== Constants ====================
 
@@ -36,12 +41,20 @@ var _hex_terrain: Dictionary = {}
 var _visible_hexes: Dictionary = {}
 # highlight_hexes: Dictionary  Vector2i -> Color  (deploy targeting)
 var _highlight_hexes: Dictionary = {}
-# path_highlight_hexes: Dictionary  Vector2i -> Color  (current-round move destinations)
-var _path_highlight_hexes: Dictionary = {}
 # adjacent_highlight_hexes: Dictionary  Vector2i -> Color  (valid moves for selected robot)
 var _adjacent_highlight_hexes: Dictionary = {}
-# move_arrows: Array of {from: Vector2, to: Vector2, color: Color} for current round
-var _move_arrows: Array = []
+# Planned paths for the player's robots, rebuilt by update_plan_display():
+# Array of {points: PackedVector2Array, color: Color, selected: bool,
+#           tip: Vector2, labels: Dictionary Vector2i -> Array[String],
+#           issues: Array[Vector2i], deploys: Array[{hex, label}]}
+var _plan_paths: Array = []
+# Hover preview route from the selected robot's cursor: Array of Vector2 points.
+var _hover_points: PackedVector2Array = PackedVector2Array()
+var _hover_valid: bool = true
+
+# Mouse tracking for hover/drag/right-click detection
+var _last_hover_hex: Vector2i = Vector2i(-9999, -9999)
+var _right_press_pos: Vector2 = Vector2.ZERO
 
 # Robot sprite nodes: robot_id -> RobotSprite node
 var _robot_sprites: Dictionary = {}
@@ -172,47 +185,86 @@ func set_selected_robot(robot_id: String) -> void:
 	if robot_id != "" and robot_id in _robot_sprites:
 		_robot_sprites[robot_id].set_selected(true)
 
-# ==================== Projected Positions ====================
+# ==================== Plan Display ====================
 
-# Move robot sprites to their projected positions at the start of current_round,
-# and draw move arrows for any planned move in current_round.
-func update_projected_positions(action_plan: Dictionary, current_round: int,
-		robot_lookup: Dictionary) -> void:
-	_path_highlight_hexes.clear()
-	_move_arrows.clear()
+# Place the player's robot sprites for view_round (-1 = turn start) and
+# rebuild the path overlay for every robot in TurnInput.plans.
+func update_plan_display(selected_robot_id: String, view_round: int) -> void:
+	_plan_paths.clear()
 
-	for robot_id in action_plan.keys():
-		var robot = robot_lookup.get(robot_id, {})
+	for robot_id in TurnInput.plans.keys():
+		var robot = GameState.robot_lookup.get(robot_id, {})
 		if robot.is_empty():
 			continue
 
-		# Compute projected position entering this round (after rounds 0..current_round-1)
-		var start_pos = robot.get("position", [0, 0])
-		var proj_pos = start_pos.duplicate()
-		var rounds = action_plan.get(robot_id, [])
-		for i in range(current_round):
-			if i < rounds.size() and rounds[i].get("action_type", "wait") == "move":
-				proj_pos = rounds[i].get("after_position", proj_pos)
-
-		var proj_hex = Vector2i(int(proj_pos[0]), int(proj_pos[1]))
-
-		# Reposition sprite
 		if robot_id in _robot_sprites:
-			_robot_sprites[robot_id].position = HexMath.axial_to_pixel(proj_hex, HEX_SIZE)
-			_robot_sprites[robot_id].axial_pos = proj_hex
+			var shown_hex = TurnInput.get_projected_hex(robot_id, view_round - 1)
+			_robot_sprites[robot_id].position = HexMath.axial_to_pixel(shown_hex, HEX_SIZE)
+			_robot_sprites[robot_id].axial_pos = shown_hex
 
-		# Build move arrow if this robot has a move in current_round
-		if current_round < rounds.size() and rounds[current_round].get("action_type", "wait") == "move":
-			var dest_arr = rounds[current_round].get("after_position", proj_pos)
-			var dest_hex = Vector2i(int(dest_arr[0]), int(dest_arr[1]))
-			var from_px = HexMath.axial_to_pixel(proj_hex, HEX_SIZE)
-			var to_px = HexMath.axial_to_pixel(dest_hex, HEX_SIZE)
-			var team = robot.get("team", 0)
-			var rtype = robot.get("type", "captain")
-			var color = RobotSprite.TEAM_COLORS.get(team, {}).get(rtype, Color.WHITE)
-			_move_arrows.append({"from": from_px, "to": to_px, "color": Color(color.r, color.g, color.b, 0.9)})
-			_path_highlight_hexes[dest_hex] = Color(color.r, color.g, color.b, 0.35)
+		var color = RobotSprite.TEAM_COLORS.get(robot.get("team", 0), {}).get(
+			robot.get("type", "captain"), Color.WHITE)
+		var is_selected = robot_id == selected_robot_id
+		var issues = TurnInput.get_step_issues(robot_id)
+		var steps = TurnInput.get_steps(robot_id)
 
+		var hex = TurnInput.get_start_hex(robot_id)
+		var points := PackedVector2Array([HexMath.axial_to_pixel(hex, HEX_SIZE)])
+		var labels: Dictionary = {}
+		var issue_hexes: Array = []
+		var deploys: Array = []
+		for i in range(steps.size()):
+			if TurnInput.has_deploy(robot_id, i):
+				deploys.append({
+					"hex": TurnInput.get_deploy_target(robot_id, i),
+					"label": "D%d" % (i + 1),
+				})
+			var label: String
+			if steps[i].get("type", "wait") == "move":
+				hex += HexMath.AXIAL_DIRECTIONS[steps[i]["dir"]]
+				points.append(HexMath.axial_to_pixel(hex, HEX_SIZE))
+				label = str(i + 1)
+			else:
+				label = "w%d" % (i + 1)
+			if not labels.has(hex):
+				labels[hex] = []
+			labels[hex].append(label)
+			if i in issues:
+				issue_hexes.append(hex)
+		# Deploys can be planned on implicit-wait rounds past the last step.
+		for i in range(steps.size(), TurnInput.ROUNDS_PER_TURN):
+			if TurnInput.has_deploy(robot_id, i):
+				deploys.append({
+					"hex": TurnInput.get_deploy_target(robot_id, i),
+					"label": "D%d" % (i + 1),
+				})
+				if i in issues:
+					issue_hexes.append(hex)
+
+		_plan_paths.append({
+			"points": points,
+			"color": color,
+			"selected": is_selected,
+			"tip": points[points.size() - 1],
+			"labels": labels,
+			"issues": issue_hexes,
+			"deploys": deploys,
+		})
+
+	queue_redraw()
+
+# Dashed preview of the route the selected robot would take to the hovered hex.
+func set_hover_route(hexes: Array, valid: bool) -> void:
+	_hover_points = PackedVector2Array()
+	for h in hexes:
+		_hover_points.append(HexMath.axial_to_pixel(h, HEX_SIZE))
+	_hover_valid = valid
+	queue_redraw()
+
+func clear_hover_route() -> void:
+	if _hover_points.is_empty():
+		return
+	_hover_points = PackedVector2Array()
 	queue_redraw()
 
 # ==================== Hex Object Management ====================
@@ -281,10 +333,10 @@ func clear_adjacent_highlights() -> void:
 	_adjacent_highlight_hexes.clear()
 	queue_redraw()
 
-# Clear planned-move path highlights and arrows (called when entering replay).
+# Clear planned path overlay (called when entering replay).
 func clear_path_highlights() -> void:
-	_path_highlight_hexes.clear()
-	_move_arrows.clear()
+	_plan_paths.clear()
+	_hover_points = PackedVector2Array()
 	queue_redraw()
 
 # ==================== Fog of War ====================
@@ -312,18 +364,53 @@ func _draw() -> void:
 		color.a = 0.35
 		draw_circle(pixel, HEX_SIZE * 0.4, color)
 
-	# Draw move arrows on top of hex fills, under robot sprites
-	for arrow in _move_arrows:
-		var f: Vector2 = arrow["from"]
-		var t: Vector2 = arrow["to"]
-		var c: Color = arrow["color"]
-		draw_line(f, t, c, 3.0)
-		# Arrowhead
-		var dir = (t - f).normalized()
-		var perp = Vector2(-dir.y, dir.x)
-		var tip = t - dir * 10.0
-		draw_line(tip, tip + (-dir + perp) * 9.0, c, 2.5)
-		draw_line(tip, tip + (-dir - perp) * 9.0, c, 2.5)
+	_draw_plan_paths()
+
+# Planned paths: unselected robots faded, selected robot on top.
+func _draw_plan_paths() -> void:
+	var font = ThemeDB.fallback_font
+	var ordered: Array = []
+	for path in _plan_paths:
+		if not path["selected"]:
+			ordered.append(path)
+	for path in _plan_paths:
+		if path["selected"]:
+			ordered.append(path)
+
+	for path in ordered:
+		var alpha = 1.0 if path["selected"] else 0.4
+		var c: Color = path["color"]
+		var line_color = Color(c.r, c.g, c.b, 0.9 * alpha)
+		var points: PackedVector2Array = path["points"]
+		if points.size() > 1:
+			draw_polyline(points, line_color, 4.0 if path["selected"] else 2.5, true)
+			# End-of-path ghost
+			draw_arc(path["tip"], RobotSprite.SHAPE_SIZE, 0, TAU, 24, line_color, 2.0)
+
+		for hex in path["issues"]:
+			var center = HexMath.axial_to_pixel(hex, HEX_SIZE)
+			draw_polyline(_close_polygon(_hex_corners(center)), Color(1, 0.15, 0.15, alpha), 3.0)
+
+		for hex in path["labels"].keys():
+			var center = HexMath.axial_to_pixel(hex, HEX_SIZE)
+			var text = " ".join(path["labels"][hex])
+			var pos = center + Vector2(-HEX_SIZE * 0.6, HEX_SIZE * 0.72)
+			draw_rect(Rect2(pos + Vector2(-2, -13), Vector2(HEX_SIZE * 1.2, 17)), Color(0, 0, 0, 0.55 * alpha))
+			draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_CENTER, HEX_SIZE * 1.2, 13,
+				Color(1, 1, 1, alpha))
+
+		for deploy in path["deploys"]:
+			var center = HexMath.axial_to_pixel(deploy["hex"], HEX_SIZE)
+			draw_circle(center, HEX_SIZE * 0.3, Color(0.8, 0.4, 1.0, 0.6 * alpha))
+			draw_string(font, center + Vector2(-HEX_SIZE * 0.5, 5), deploy["label"],
+				HORIZONTAL_ALIGNMENT_CENTER, HEX_SIZE, 13, Color(1, 1, 1, alpha))
+
+	# Hover preview, dashed
+	if _hover_points.size() > 1:
+		var hc = Color(0.4, 1.0, 0.4, 0.9) if _hover_valid else Color(1.0, 0.3, 0.3, 0.9)
+		for i in range(_hover_points.size() - 1):
+			draw_dashed_line(_hover_points[i], _hover_points[i + 1], hc, 2.5, 8.0)
+		draw_circle(_hover_points[_hover_points.size() - 1], 6.0, hc)
 
 func _draw_hex(coord: Vector2i) -> void:
 	var center = HexMath.axial_to_pixel(coord, HEX_SIZE)
@@ -341,10 +428,6 @@ func _draw_hex(coord: Vector2i) -> void:
 	# Adjacent move highlight (green) — drawn first, lowest priority overlay
 	if coord in _adjacent_highlight_hexes:
 		draw_colored_polygon(points, _adjacent_highlight_hexes[coord])
-
-	# Planned move destination (robot color tint) for current round
-	if coord in _path_highlight_hexes:
-		draw_colored_polygon(points, _path_highlight_hexes[coord])
 
 	# Deploy targeting highlight — highest priority, drawn on top
 	if coord in _highlight_hexes:
@@ -371,15 +454,30 @@ func _close_polygon(points: PackedVector2Array) -> PackedVector2Array:
 
 # ==================== Input ====================
 
-func _input(event: InputEvent) -> void:
+# Unhandled so clicks on UI panels never reach the map.
+func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
-		# Only process the first click of a potential double-click to avoid
-		# duplicate actions (select then immediately clear).
-		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT and not event.double_click:
-			var local_pos = get_local_mouse_position()
-			var hex = HexMath.pixel_to_axial(local_pos, HEX_SIZE)
-			if hex in _hex_coords:
+		var hex = HexMath.pixel_to_axial(get_local_mouse_position(), HEX_SIZE)
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			# Only process the first click of a potential double-click to avoid
+			# duplicate actions.
+			if event.pressed and not event.double_click and hex in _hex_coords:
+				_last_hover_hex = hex
 				hex_clicked.emit(hex)
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			if event.pressed:
+				_right_press_pos = event.position
+			elif event.position.distance_to(_right_press_pos) < 6.0 and hex in _hex_coords:
+				hex_right_clicked.emit(hex, event.position)
+	elif event is InputEventMouseMotion:
+		var hex = HexMath.pixel_to_axial(get_local_mouse_position(), HEX_SIZE)
+		if hex == _last_hover_hex or not hex in _hex_coords:
+			return
+		_last_hover_hex = hex
+		if event.button_mask & MOUSE_BUTTON_MASK_LEFT:
+			hex_drag_entered.emit(hex)
+		else:
+			hex_hovered.emit(hex)
 
 # ==================== Cleanup ====================
 
@@ -388,9 +486,9 @@ func _clear_all() -> void:
 	_hex_terrain.clear()
 	_visible_hexes.clear()
 	_highlight_hexes.clear()
-	_path_highlight_hexes.clear()
 	_adjacent_highlight_hexes.clear()
-	_move_arrows.clear()
+	_plan_paths.clear()
+	_hover_points = PackedVector2Array()
 
 	for sprite in _robot_sprites.values():
 		sprite.queue_free()
