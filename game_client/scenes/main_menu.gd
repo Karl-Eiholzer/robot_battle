@@ -46,6 +46,13 @@ func _ready() -> void:
 	APIClient.game_status_received.connect(_on_status_received)
 	APIClient.request_failed.connect(_on_request_failed)
 
+	# Web build: a link like https://host/?code=golden-dragon-castle prefills the code
+	var url_code = _invite_code_from_url()
+	if url_code != "":
+		invite_code_input.text = url_code
+		player_name_input.grab_focus()
+		_show_status("Enter your name and press Join to enter the game.")
+
 # ==================== Button Handlers ====================
 
 func _on_create_pressed() -> void:
@@ -76,14 +83,14 @@ func _on_join_pressed() -> void:
 func _on_copy_team_0_pressed() -> void:
 	var code = team_0_code_display.text
 	if code != "":
-		DisplayServer.clipboard_set(code)
-		_show_status("Team 0 code copied! Share with your teammates.")
+		DisplayServer.clipboard_set(_share_text(code))
+		_show_status("Team 0 %s copied! Share with your teammates." % _share_noun())
 
 func _on_copy_team_1_pressed() -> void:
 	var code = team_1_code_display.text
 	if code != "":
-		DisplayServer.clipboard_set(code)
-		_show_status("Team 1 code copied! Share with opponents.")
+		DisplayServer.clipboard_set(_share_text(code))
+		_show_status("Team 1 %s copied! Share with opponents." % _share_noun())
 
 # ==================== API Response Handlers ====================
 
@@ -96,6 +103,9 @@ func _on_game_created(data: Dictionary) -> void:
 
 	team_0_code_display.text = team_0_code
 	team_1_code_display.text = team_1_code
+	if OS.has_feature("web"):
+		copy_team_0_btn.text = "Copy Team 0 Link"
+		copy_team_1_btn.text = "Copy Team 1 Link"
 
 	team_0_code_label.visible = true
 	team_0_code_display.visible = true
@@ -150,6 +160,25 @@ func _transition_forward() -> void:
 	# Check if we need role assignment or can go straight to game view
 	# We go to role_assignment scene; it will redirect if robots already spawned
 	get_tree().change_scene_to_file("res://scenes/role_assignment.tscn")
+
+# ==================== Share Links (web build) ====================
+
+func _invite_code_from_url() -> String:
+	if not OS.has_feature("web"):
+		return ""
+	var code = JavaScriptBridge.eval(
+		"new URLSearchParams(window.location.search).get('code') || ''", true)
+	return str(code).strip_edges() if code != null else ""
+
+func _share_text(code: String) -> String:
+	if not OS.has_feature("web"):
+		return code
+	var base = str(JavaScriptBridge.eval(
+		"window.location.origin + window.location.pathname", true))
+	return base + "?code=" + code.uri_encode()
+
+func _share_noun() -> String:
+	return "link" if OS.has_feature("web") else "code"
 
 # ==================== UI Helpers ====================
 
