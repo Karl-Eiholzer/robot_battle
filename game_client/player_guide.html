@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robot Battle Player Guide</title>
+<style>
+	:root {
+		--bg: #14141f;
+		--panel: #1d1d2b;
+		--panel-2: #252536;
+		--line: #34344a;
+		--text: #e4e4ec;
+		--muted: #a3a3b5;
+		--gold: #e6b31a;
+		--green: #66e666;
+		--red: #e65a5a;
+		--blue: #6aa8ff;
+		--purple: #b48cff;
+	}
+	* { box-sizing: border-box; }
+	html { scroll-behavior: smooth; }
+	body {
+		margin: 0;
+		background: var(--bg);
+		color: var(--text);
+		font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	}
+	.wrap { max-width: 820px; margin: 0 auto; padding: 0 16px 64px; }
+
+	header.top {
+		position: sticky; top: 0; z-index: 2;
+		background: rgba(20, 20, 31, 0.94);
+		backdrop-filter: blur(6px);
+		border-bottom: 1px solid var(--line);
+	}
+	header.top .wrap {
+		display: flex; align-items: center; justify-content: space-between;
+		gap: 12px; padding-top: 10px; padding-bottom: 10px;
+	}
+	.brand { font-weight: 800; letter-spacing: 0.08em; color: var(--gold); }
+	.btn {
+		display: inline-block; padding: 9px 16px; border-radius: 8px;
+		background: var(--gold); color: #1a1405; font-weight: 700;
+		text-decoration: none; white-space: nowrap;
+	}
+	.btn:hover, .btn:focus-visible { background: #f5c93a; }
+
+	.hero { text-align: center; padding: 40px 0 12px; }
+	.hero h1 { margin: 0; font-size: 2.4rem; letter-spacing: 0.06em; color: var(--gold); }
+	.hero p { margin: 6px 0 0; color: var(--muted); }
+
+	nav.toc {
+		display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+		margin: 20px 0 8px;
+	}
+	nav.toc a {
+		color: var(--text); text-decoration: none; padding: 6px 12px;
+		border: 1px solid var(--line); border-radius: 999px; font-size: 0.95rem;
+	}
+	nav.toc a:hover { border-color: var(--gold); color: var(--gold); }
+
+	section { padding-top: 32px; scroll-margin-top: 60px; }
+	h2 {
+		font-size: 1.6rem; margin: 0 0 12px; padding-bottom: 6px;
+		border-bottom: 2px solid var(--gold);
+	}
+	h2 .num { color: var(--gold); margin-right: 6px; }
+	h3 { font-size: 1.2rem; margin: 24px 0 8px; }
+	p { margin: 0 0 12px; }
+	ul, ol { margin: 0 0 12px; padding-left: 22px; }
+	li { margin-bottom: 4px; }
+	strong { color: #fff; }
+	.muted { color: var(--muted); }
+
+	.callout {
+		background: var(--panel); border-left: 4px solid var(--gold);
+		border-radius: 8px; padding: 14px 16px; margin: 16px 0;
+	}
+	.callout.tip { border-left-color: var(--blue); }
+	.callout.warn { border-left-color: var(--red); }
+	.callout p:last-child, .callout ul:last-child { margin-bottom: 0; }
+	.callout .label {
+		display: block; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.08em;
+		text-transform: uppercase; margin-bottom: 4px; color: var(--gold);
+	}
+	.callout.tip .label { color: var(--blue); }
+	.callout.warn .label { color: var(--red); }
+
+	.table-wrap { overflow-x: auto; margin: 12px 0 16px; }
+	table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+	th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); }
+	th { color: var(--muted); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; }
+	td.n { text-align: center; }
+
+	.robot {
+		background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+		padding: 18px; margin: 18px 0;
+	}
+	.robot-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+	.robot-head svg { flex: none; }
+	.robot-head h3 { margin: 0; font-size: 1.35rem; }
+	.robot-head .role { color: var(--muted); font-size: 0.95rem; }
+	.stats {
+		display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+		gap: 8px; margin: 12px 0 14px;
+	}
+	.stat { background: var(--panel-2); border-radius: 8px; padding: 8px 10px; text-align: center; }
+	.stat b { display: block; font-size: 1.35rem; color: #fff; }
+	.stat span { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+	.ability {
+		border-top: 1px solid var(--line); padding-top: 12px; margin-top: 4px;
+	}
+	.ability h4 { margin: 0 0 6px; font-size: 1.05rem; color: var(--purple); }
+
+	.ko {
+		display: grid; grid-template-columns: 1fr; gap: 12px; margin: 16px 0;
+	}
+	@media (min-width: 640px) { .ko { grid-template-columns: 1fr 1fr; } }
+	.ko-card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+	.ko-card h3 { margin: 0 0 6px; font-size: 1.1rem; }
+	.ko-card p { margin: 0 0 8px; }
+	.tag {
+		display: inline-block; font-size: 0.78rem; font-weight: 700; padding: 2px 8px;
+		border-radius: 999px; margin-right: 4px;
+	}
+	.tag.home { background: rgba(230, 90, 90, 0.18); color: var(--red); }
+	.tag.place { background: rgba(106, 168, 255, 0.18); color: var(--blue); }
+
+	.bottom { text-align: center; margin-top: 48px; }
+</style>
+</head>
+<body>
+
+<header class="top">
+	<div class="wrap">
+		<span class="brand">ROBOT BATTLE</span>
+		<a class="btn return-link" href="./">Return to Main Menu</a>
+	</div>
+</header>
+
+<main class="wrap">
+
+	<div class="hero">
+		<h1>Player Guide</h1>
+		<p>Everything a new commander needs to know before the first turn.</p>
+	</div>
+
+	<nav class="toc" aria-label="Sections">
+		<a href="#win">1. How to Win</a>
+		<a href="#robots">2. The Robots</a>
+		<a href="#knockouts">3. Getting Knocked Out</a>
+	</nav>
+
+	<!-- ==================== 1. How to Win ==================== -->
+	<section id="win">
+		<h2><span class="num">1</span>How to Win</h2>
+
+		<div class="callout">
+			<span class="label">The goal</span>
+			<p><strong>Move any one of your robots into the hex where the enemy Captain is standing.</strong> That is a <em>Capture</em>, and your team wins on the spot.</p>
+		</div>
+
+		<p>Each team has exactly one Captain. You win by capturing theirs, and you lose if they capture yours. So every turn you are doing two jobs at once: getting a robot to the enemy Captain, and keeping enemy robots away from your own.</p>
+
+		<ul>
+			<li><strong>Any robot can make the capture.</strong> Strength does not matter here. Even an Engineer, the weakest robot, wins the game if it steps onto the enemy Captain.</li>
+			<li><strong>The capture has to be a move.</strong> Your robot must step into the Captain's hex during a round. Standing next to it is not enough.</li>
+			<li><strong>The game ends the moment it happens.</strong> Nothing else in that turn is played out.</li>
+		</ul>
+
+		<h3>How a turn works</h3>
+		<ol>
+			<li><strong>Plan.</strong> Everyone plans at the same time. You draw a path for each of your robots on the map. A turn has <strong>6 rounds</strong>, and in each round a robot either <strong>moves</strong> one hex or <strong>waits</strong>. You cannot see what anyone else is planning.</li>
+			<li><strong>Submit.</strong> Press <em>Submit Turn</em> (or Enter) before the timer runs out. If time runs out, your plan is sent as it stands. Any round you left empty becomes a wait.</li>
+			<li><strong>Watch the replay.</strong> When every player has submitted, the server plays all the moves together and everyone watches the same replay.</li>
+		</ol>
+
+		<h3>Who goes first</h3>
+		<p>Inside each round, robots act one at a time. The order matters when two robots try for the same hex.</p>
+		<ul>
+			<li>The team with the <strong>Initiative</strong> moves all of its robots first. Initiative swaps between the teams every turn, and the top bar shows who has it.</li>
+			<li>Within a team, <strong>Engineers</strong> act first, then the <strong>Captain</strong>, then <strong>Scouts and Defenders</strong>.</li>
+		</ul>
+
+		<div class="callout tip">
+			<span class="label">Tip</span>
+			<p>Your plan can go wrong. If a move is blocked by a teammate or by an enemy at least as strong, your robot stays put and tries that same move again next round. Every later step slides one round later, and steps pushed past round 6 don't happen. Leave a spare round or two when timing matters.</p>
+		</div>
+	</section>
+
+	<!-- ==================== 2. The Robots ==================== -->
+	<section id="robots">
+		<h2><span class="num">2</span>The Robots</h2>
+
+		<p>There are four kinds of robot. They differ in how far they can move each turn, how strong they are, how far they can see, and which <strong>special ability</strong> they have.</p>
+
+		<h3>Rules every robot follows</h3>
+		<ul>
+			<li><strong>Movement.</strong> A move goes to one of the six neighbouring hexes. Each robot has a limited number of moves per turn, and the rounds it does not move in are waits. You can mix moves and waits in any order.</li>
+			<li><strong>Blocked hexes.</strong> Robots cannot enter walls or other blocked terrain, and they cannot move onto a teammate.</li>
+			<li><strong>Strength.</strong> When a robot tries to move onto an enemy, the stronger one wins. See <a href="#knockouts">section 3</a>.</li>
+			<li><strong>Energy and abilities.</strong> Using a special ability (pressing <em>Deploy</em>) costs <strong>1 energy</strong>. A robot with no energy cannot use its ability. Each robot type has a maximum energy it can hold.</li>
+			<li><strong>Sight.</strong> Each robot sees enemies within its sight range.</li>
+		</ul>
+
+		<div class="table-wrap">
+			<table>
+				<thead>
+					<tr><th>Robot</th><th>Moves / turn</th><th>Strength</th><th>Max energy</th><th>Sight</th><th>Ability</th></tr>
+				</thead>
+				<tbody>
+					<tr><td><strong>Captain</strong></td><td class="n">3</td><td class="n">7</td><td class="n">2</td><td class="n">5</td><td>EMP</td></tr>
+					<tr><td><strong>Scout</strong></td><td class="n">4</td><td class="n">3</td><td class="n">6</td><td class="n">7</td><td>Extra Moves</td></tr>
+					<tr><td><strong>Defender</strong></td><td class="n">2</td><td class="n">5</td><td class="n">3</td><td class="n">3</td><td>Firewall</td></tr>
+					<tr><td><strong>Engineer</strong></td><td class="n">6</td><td class="n">0</td><td class="n">3</td><td class="n">5</td><td>Supply Drop</td></tr>
+				</tbody>
+			</table>
+		</div>
+
+		<!-- Captain -->
+		<article class="robot">
+			<div class="robot-head">
+				<svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><polygon points="11,3 33,3 43,22 33,41 11,41 1,22" fill="#3a2f0c" stroke="#e6b31a" stroke-width="2.5"/><path d="M13 28 L15 16 L19 22 L22 14 L25 22 L29 16 L31 28 Z" fill="#e6b31a"/></svg>
+				<div>
+					<h3>Captain</h3>
+					<div class="role">The robot you must protect. Lose it and you lose the game.</div>
+				</div>
+			</div>
+			<div class="stats">
+				<div class="stat"><b>3</b><span>Moves</span></div>
+				<div class="stat"><b>7</b><span>Strength</span></div>
+				<div class="stat"><b>2</b><span>Max energy</span></div>
+				<div class="stat"><b>5</b><span>Sight</span></div>
+			</div>
+			<p><strong>Movement:</strong> up to 3 moves per turn. The Captain is the <strong>strongest robot in the game</strong>, so it can shove any other enemy robot out of its way. However, any enemy robot that steps onto it, however weak, wins the game.</p>
+			<div class="ability">
+				<h4>Special ability: EMP</h4>
+				<p>Fires an electromagnetic pulse at a hex <strong>4 to 6 hexes away in a straight line</strong>. The pulse covers the target and every hex within 3 of it.</p>
+				<ul>
+					<li>Any robot that <strong>waits</strong> on an EMP hex is <strong>stunned where it stands</strong> for the rest of the turn. Robots that only pass through are not affected.</li>
+					<li>The EMP stays on the map and does not wear off.</li>
+					<li>It affects <strong>your own robots too</strong>, so plan your waits carefully.</li>
+				</ul>
+			</div>
+		</article>
+
+		<!-- Scout -->
+		<article class="robot">
+			<div class="robot-head">
+				<svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><polygon points="11,3 33,3 43,22 33,41 11,41 1,22" fill="#0f2a1a" stroke="#66e666" stroke-width="2.5"/><path d="M8 22 Q22 10 36 22 Q22 34 8 22 Z" fill="none" stroke="#66e666" stroke-width="2.5"/><circle cx="22" cy="22" r="4" fill="#66e666"/></svg>
+				<div>
+					<h3>Scout</h3>
+					<div class="role">The fast hunter. It sees far and covers ground quickly.</div>
+				</div>
+			</div>
+			<div class="stats">
+				<div class="stat"><b>4</b><span>Moves</span></div>
+				<div class="stat"><b>3</b><span>Strength</span></div>
+				<div class="stat"><b>6</b><span>Max energy</span></div>
+				<div class="stat"><b>7</b><span>Sight</span></div>
+			</div>
+			<p><strong>Movement:</strong> up to 4 moves per turn, and up to 6 with its ability. Scouts have the <strong>longest sight range</strong>, which makes them your eyes on the battlefield. They are fairly weak: they can push an Engineer aside, but Defenders and Captains will knock them back.</p>
+			<div class="ability">
+				<h4>Special ability: Extra Moves</h4>
+				<p>Spends 1 energy to gain <strong>2 extra moves this turn</strong>. It takes effect right away while you plan, so you can draw the longer path immediately. With the most energy of any robot, a Scout can do this turn after turn.</p>
+			</div>
+		</article>
+
+		<!-- Defender -->
+		<article class="robot">
+			<div class="robot-head">
+				<svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><polygon points="11,3 33,3 43,22 33,41 11,41 1,22" fill="#0f1c33" stroke="#6aa8ff" stroke-width="2.5"/><path d="M22 10 L32 14 L31 24 Q29 32 22 35 Q15 32 13 24 L12 14 Z" fill="#6aa8ff"/></svg>
+				<div>
+					<h3>Defender</h3>
+					<div class="role">The slow, sturdy guard that keeps hunters away from your Captain.</div>
+				</div>
+			</div>
+			<div class="stats">
+				<div class="stat"><b>2</b><span>Moves</span></div>
+				<div class="stat"><b>5</b><span>Strength</span></div>
+				<div class="stat"><b>3</b><span>Max energy</span></div>
+				<div class="stat"><b>3</b><span>Sight</span></div>
+			</div>
+			<p><strong>Movement:</strong> only 2 moves per turn, and it has the <strong>shortest sight range</strong>. What it has is strength. A Defender beats Scouts and Engineers, so a Defender standing next to your Captain is a wall that enemy Scouts cannot get through.</p>
+			<div class="ability">
+				<h4>Special ability: Firewall</h4>
+				<p>Lays a firewall in a <strong>straight line of 4 hexes</strong> running out from the Defender.</p>
+				<ul>
+					<li>Any robot that <strong>waits</strong> on a firewall hex is <strong>sent back to its starting hex and stunned</strong>. That piece of firewall burns out after it catches someone.</li>
+					<li>Robots that only pass through are not affected.</li>
+					<li>It affects <strong>your own robots too</strong>.</li>
+				</ul>
+			</div>
+		</article>
+
+		<!-- Engineer -->
+		<article class="robot">
+			<div class="robot-head">
+				<svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><polygon points="11,3 33,3 43,22 33,41 11,41 1,22" fill="#26173a" stroke="#b48cff" stroke-width="2.5"/><circle cx="22" cy="22" r="8" fill="none" stroke="#b48cff" stroke-width="4" stroke-dasharray="4 2.3"/><circle cx="22" cy="22" r="3" fill="#b48cff"/></svg>
+				<div>
+					<h3>Engineer</h3>
+					<div class="role">The quick support robot. It keeps the team supplied with energy.</div>
+				</div>
+			</div>
+			<div class="stats">
+				<div class="stat"><b>6</b><span>Moves</span></div>
+				<div class="stat"><b>0</b><span>Strength</span></div>
+				<div class="stat"><b>3</b><span>Max energy</span></div>
+				<div class="stat"><b>5</b><span>Sight</span></div>
+			</div>
+			<p><strong>Movement:</strong> can move in <strong>all 6 rounds</strong>, more than any other robot, and it always acts first in its team's order. With <strong>zero strength</strong>, every enemy robot beats it and it can never push anyone aside. Like any robot, though, it wins the game if it reaches the enemy Captain.</p>
+			<div class="ability">
+				<h4>Special ability: Supply Drop</h4>
+				<p>Places a supply crate on a <strong>neighbouring hex</strong>. It cannot go on a blocked hex or on a hex that already has a crate.</p>
+				<ul>
+					<li>The first robot to <strong>move onto</strong> the crate picks it up and gains <strong>1 energy</strong>, up to its maximum. The crate is then gone.</li>
+					<li>Anyone can grab it, enemies included, so drop crates where your team will reach them first.</li>
+				</ul>
+			</div>
+		</article>
+
+		<h3>Who controls which robots</h3>
+		<p>Before the game starts, each player chooses a role. The role decides which robots that player controls.</p>
+		<div class="table-wrap">
+			<table>
+				<thead><tr><th>Team size</th><th>Role</th><th>Robots</th></tr></thead>
+				<tbody>
+					<tr><td rowspan="2">2 players</td><td><strong>Captain</strong></td><td>1 Captain, 2 Defenders, 2 Engineers</td></tr>
+					<tr><td><strong>Huntsman</strong></td><td>4 Scouts, 1 Engineer</td></tr>
+					<tr><td rowspan="3">3 players</td><td><strong>Captain</strong></td><td>1 Captain, 3 Defenders</td></tr>
+					<tr><td><strong>Huntsman</strong></td><td>5 Scouts</td></tr>
+					<tr><td><strong>Engineer</strong></td><td>5 Engineers</td></tr>
+				</tbody>
+			</table>
+		</div>
+	</section>
+
+	<!-- ==================== 3. Getting Knocked Out ==================== -->
+	<section id="knockouts">
+		<h2><span class="num">3</span>Getting Knocked Out</h2>
+
+		<p>Robots are never removed from the game. A robot that loses a fight or walks into a trap is <strong>knocked out</strong> instead. Sometimes it is also sent back to where it started.</p>
+
+		<div class="callout warn">
+			<span class="label">What "stunned" means</span>
+			<ul>
+				<li>A stunned robot <strong>does nothing for the rest of the turn</strong>. Its remaining planned steps are skipped.</li>
+				<li>It <strong>recovers automatically</strong> at the start of the next turn, with its energy unchanged.</li>
+				<li>While stunned, it <strong>does not block anything</strong>. Other robots can move straight through its hex, and a stunned Captain cannot be captured.</li>
+			</ul>
+		</div>
+
+		<p>There are four ways to be knocked out:</p>
+
+		<div class="ko">
+			<div class="ko-card">
+				<h3>1. Pushed by a stronger enemy</h3>
+				<p><span class="tag home">Sent home + stunned</span></p>
+				<p>If an enemy with <strong>higher strength</strong> moves onto your robot's hex, your robot is shoved all the way back to its <strong>starting hex</strong> and stunned. The attacker takes the hex.</p>
+				<p class="muted">Strength order: Captain 7 &gt; Defender 5 &gt; Scout 3 &gt; Engineer 0.</p>
+			</div>
+			<div class="ko-card">
+				<h3>2. Sharing a hex with a stronger enemy</h3>
+				<p><span class="tag home">Sent home + stunned</span></p>
+				<p>Because stunned robots don't block, a robot can end up in the same hex as an enemy. When the weaker one next acts, it is sent back to its starting hex and stunned.</p>
+			</div>
+			<div class="ko-card">
+				<h3>3. Waiting on a Firewall</h3>
+				<p><span class="tag home">Sent home + stunned</span></p>
+				<p>A robot that <strong>waits</strong> on a firewall hex is sent back to its starting hex and stunned. That piece of firewall is used up. Moving through it is safe.</p>
+			</div>
+			<div class="ko-card">
+				<h3>4. Waiting in an EMP</h3>
+				<p><span class="tag place">Stunned in place</span></p>
+				<p>A robot that <strong>waits</strong> on an EMP hex is stunned <strong>where it stands</strong>. The EMP stays on the map, so it is dangerous to wait there on later turns too. Moving through it is safe.</p>
+			</div>
+		</div>
+
+		<h3>What does <em>not</em> knock you out</h3>
+		<ul>
+			<li><strong>Bumping into an equal or stronger enemy.</strong> Your robot stays where it is and tries the same move again next round. Robots of equal strength block each other.</li>
+			<li><strong>Bumping into a teammate.</strong> Same result: you stay put and try again next round, so if the teammate moves away, you follow.</li>
+		</ul>
+
+		<div class="callout tip">
+			<span class="label">Why getting sent home hurts</span>
+			<p>Every robot's starting hex is at your team's spawn on the edge of the map. A Scout knocked home from the middle of the map can lose two or three turns walking back. The opposite is also true: <strong>knocking enemy robots home is the best way to clear a path to their Captain.</strong></p>
+		</div>
+	</section>
+
+	<div class="bottom">
+		<a class="btn return-link" href="./">Return to Main Menu</a>
+	</div>
+
+</main>
+
+<script>
+	// Keep an invite code from a share link so returning to the menu still prefills it
+	(function () {
+		var code = new URLSearchParams(window.location.search).get("code");
+		if (!code) return;
+		var links = document.querySelectorAll(".return-link");
+		for (var i = 0; i < links.length; i++) {
+			links[i].href = "./?code=" + encodeURIComponent(code);
+		}
+	})();
+</script>
+</body>
+</html>

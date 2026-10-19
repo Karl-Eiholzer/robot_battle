@@ -34,3 +34,4 @@ RUN mkdir -p build/web \
 FROM caddy:2-alpine
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /src/build/web /srv
+COPY player_guide.html /srv/

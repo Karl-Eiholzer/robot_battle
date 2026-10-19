@@ -7,7 +7,7 @@
 	encode zstd gzip
 
 	# Always revalidate the entry page and game data so redeploys show up immediately
-	@fresh path / /index.html /index.pck
+	@fresh path / /index.html /index.pck /player_guide.html
 	header @fresh Cache-Control "no-cache"
 
 	header /index.wasm Cache-Control "public, max-age=3600"

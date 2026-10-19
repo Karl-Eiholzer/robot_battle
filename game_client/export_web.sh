@@ -8,4 +8,5 @@ if ! command -v "$GODOT" >/dev/null && [ -x /Applications/Godot.app/Contents/Mac
 fi
 mkdir -p build/web
 "$GODOT" --headless --export-release "Web" build/web/index.html
+cp player_guide.html build/web/
 echo "Exported to $(pwd)/build/web"

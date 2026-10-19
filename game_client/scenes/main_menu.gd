@@ -15,6 +15,7 @@ extends Control
 @onready var team_1_code_label: Label = $CenterContainer/VBox/Team1CodeLabel
 @onready var team_1_code_display: Label = $CenterContainer/VBox/Team1CodeDisplay
 @onready var copy_team_1_btn: Button = $CenterContainer/VBox/CopyTeam1Btn
+@onready var player_guide_btn: Button = $CenterContainer/VBox/PlayerGuideBtn
 @onready var poll_timer: Timer = $PollTimer
 
 # ==================== State ====================
@@ -38,6 +39,7 @@ func _ready() -> void:
 	join_game_btn.pressed.connect(_on_join_pressed)
 	copy_team_0_btn.pressed.connect(_on_copy_team_0_pressed)
 	copy_team_1_btn.pressed.connect(_on_copy_team_1_pressed)
+	player_guide_btn.pressed.connect(_on_player_guide_pressed)
 	poll_timer.timeout.connect(_on_poll_timer)
 
 	# Connect API signals
@@ -91,6 +93,15 @@ func _on_copy_team_1_pressed() -> void:
 	if code != "":
 		DisplayServer.clipboard_set(_share_text(code))
 		_show_status("Team 1 %s copied! Share with opponents." % _share_noun())
+
+func _on_player_guide_pressed() -> void:
+	if OS.has_feature("web"):
+		# Same tab, so the guide's "Return to Main Menu" lands back here; carry any invite code along
+		var code = invite_code_input.text.strip_edges()
+		var query = "?code=" + code.uri_encode() if code != "" else ""
+		JavaScriptBridge.eval("window.location.href = 'player_guide.html%s'" % query, true)
+	else:
+		OS.shell_open(ProjectSettings.globalize_path("res://player_guide.html"))
 
 # ==================== API Response Handlers ====================
 
