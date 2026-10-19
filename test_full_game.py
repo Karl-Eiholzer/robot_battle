@@ -644,8 +644,10 @@ class FullGameTester:
         # Captain can deploy EMP - target 4-6 hexes away in a line
         captain_pos = captain["position"]
         emp_target = [captain_pos[0] + 4, captain_pos[1]]  # 4 hexes away
-        # EMP affects target + 3-hex radius
-        emp_hexes = [emp_target]  # Simplified: just the target hex
+        # EMP affects target + 3-hex radius (37 hexes)
+        emp_hexes = [[emp_target[0] + dq, emp_target[1] + dr]
+                     for dq in range(-3, 4)
+                     for dr in range(max(-3, -dq - 3), min(3, -dq + 3) + 1)]
 
         captain_player = next((p for p in players if p["id"] == captain["player_id"]), None)
 
@@ -674,7 +676,10 @@ class FullGameTester:
                 self.log_success("EMP deploy action processed successfully")
                 hex_objects = results.get("updated_hex_objects", [])
                 emp_objects = [o for o in (hex_objects or []) if o.get("type") == "emp"]
-                self.log_info(f"EMP objects created: {len(emp_objects)}")
+                if len(emp_objects) == len(emp_hexes):
+                    self.log_success(f"EMP covered all {len(emp_objects)} hexes")
+                else:
+                    self.log_error(f"EMP created {len(emp_objects)} objects, expected {len(emp_hexes)}")
             else:
                 self.log_error("Failed to get results after EMP deploy")
         else:

@@ -452,13 +452,13 @@ def process_turn_with_robots(
 
             after_pos = robot["position"][:]
 
-            # Always advance action index by 1 per round (each round consumes one action slot)
-            # Stunned robots skip their action but still use up a round slot
+            # Only a successful action is used up. A blocked move (fail/error) stays
+            # pending and is retried next round, so later steps slide one round later
+            # and the planned positions stay chained to where the robot really is.
             ai = action_index.get(robot_id, 0)
-            if status not in ("stunned",) and ai < len(actions):
-                # Mark the processed action with its outcome
+            if status in ("success", "win") and ai < len(actions):
                 actions[ai]["status"] = status
-            action_index[robot_id] = ai + 1
+                action_index[robot_id] = ai + 1
 
             # Record replay frame
             replay_frame = {
@@ -892,6 +892,8 @@ def validate_player_actions(
                         f"Robot {robot_id} ({robot['type']}) cannot use deploy type "
                         f"'{deploy_type}' (must use '{stats.deploy_type}')"
                     )
+                else:
+                    errors.extend(validate_deploy_area(robot_id, action, deploy))
                 deploy_count += 1
 
         # Check energy for deploys
@@ -901,6 +903,44 @@ def validate_player_actions(
             )
 
     return errors
+
+
+EMP_RADIUS = 3
+FIREWALL_LENGTH = 4
+
+
+def validate_deploy_area(robot_id: str, action: Dict, deploy: Dict) -> List[str]:
+    """
+    Check a deploy's target_hexes against its type: an EMP is every hex within
+    EMP_RADIUS of a center 4-6 hexes from the robot; a Firewall is one hex
+    at each distance 1..FIREWALL_LENGTH from the robot.
+    """
+    deploy_type = deploy.get("type")
+    hexes = deploy.get("target_hexes") or []
+    origin = action.get("before_position")
+    if not hexes or origin is None:
+        return [f"Robot {robot_id} deploy '{deploy_type}' has no target hexes"]
+
+    if deploy_type == "emp":
+        hex_set = {tuple(h) for h in hexes}
+        for center in hexes:
+            if 4 <= hex_distance(origin, center) <= 6:
+                area = {tuple(h) for h in hexes_within_radius(center, EMP_RADIUS)}
+                if hex_set == area:
+                    return []
+        return [f"Robot {robot_id} EMP must cover a 4-6 hex target and all hexes within {EMP_RADIUS} of it"]
+
+    if deploy_type == "firewall":
+        distances = sorted(hex_distance(origin, h) for h in hexes)
+        if distances != list(range(1, FIREWALL_LENGTH + 1)):
+            return [f"Robot {robot_id} Firewall must be a line of {FIREWALL_LENGTH} hexes from the robot"]
+        return []
+
+    if deploy_type == "supply_drop":
+        if len(hexes) != 1 or hex_distance(origin, hexes[0]) != 1:
+            return [f"Robot {robot_id} Supply Drop must target one adjacent hex"]
+
+    return []
 
 
 def filter_robots_by_sight(

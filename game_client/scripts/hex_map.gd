@@ -219,10 +219,7 @@ func update_plan_display(selected_robot_id: String, view_round: int) -> void:
 		var deploys: Array = []
 		for i in range(steps.size()):
 			if TurnInput.has_deploy(robot_id, i):
-				deploys.append({
-					"hex": TurnInput.get_deploy_target(robot_id, i),
-					"label": "D%d" % (i + 1),
-				})
+				deploys.append(_deploy_marker(robot_id, i))
 			var label: String
 			if steps[i].get("type", "wait") == "move":
 				hex += HexMath.AXIAL_DIRECTIONS[steps[i]["dir"]]
@@ -238,10 +235,7 @@ func update_plan_display(selected_robot_id: String, view_round: int) -> void:
 		# Deploys can be planned on implicit-wait rounds past the last step.
 		for i in range(steps.size(), TurnInput.ROUNDS_PER_TURN):
 			if TurnInput.has_deploy(robot_id, i):
-				deploys.append({
-					"hex": TurnInput.get_deploy_target(robot_id, i),
-					"label": "D%d" % (i + 1),
-				})
+				deploys.append(_deploy_marker(robot_id, i))
 				if i in issues:
 					issue_hexes.append(hex)
 
@@ -256,6 +250,15 @@ func update_plan_display(selected_robot_id: String, view_round: int) -> void:
 		})
 
 	queue_redraw()
+
+func _deploy_marker(robot_id: String, round_num: int) -> Dictionary:
+	var target = TurnInput.get_deploy_target(robot_id, round_num)
+	var from_hex = TurnInput.get_projected_hex(robot_id, round_num - 1)
+	return {
+		"hex": target,
+		"label": "D%d" % (round_num + 1),
+		"area": TurnInput.get_deploy_area(TurnInput.get_deploy_type(robot_id), from_hex, target),
+	}
 
 # Dashed preview of the route the selected robot would take to the hovered hex.
 func set_hover_route(hexes: Array, valid: bool) -> void:
@@ -410,6 +413,11 @@ func _draw_plan_paths() -> void:
 				Color(1, 1, 1, alpha))
 
 		for deploy in path["deploys"]:
+			# Outline every hex the EMP / Firewall will cover
+			for area_hex in deploy["area"]:
+				if area_hex != deploy["hex"]:
+					var ac = HexMath.axial_to_pixel(area_hex, HEX_SIZE)
+					draw_polyline(_close_polygon(_hex_corners(ac)), Color(0.8, 0.4, 1.0, 0.5 * alpha), 2.0)
 			var center = HexMath.axial_to_pixel(deploy["hex"], HEX_SIZE)
 			draw_circle(center, HEX_SIZE * 0.3, Color(0.8, 0.4, 1.0, 0.6 * alpha))
 			draw_string(font, center + Vector2(-HEX_SIZE * 0.5, 5), deploy["label"],

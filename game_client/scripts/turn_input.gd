@@ -16,6 +16,7 @@ enum Phase {
 }
 
 const ROUNDS_PER_TURN: int = 6
+const EMP_RADIUS: int = 3
 
 # ==================== State ====================
 
@@ -486,9 +487,12 @@ func build_submit_payload() -> Array:
 				var target = cur_hex + deploys[i]["offset"]
 				if target in get_valid_deploy_targets(robot_id, cur_hex):
 					energy_left -= 1
+					var area: Array = []
+					for h in get_deploy_area(deploys[i]["type"], cur_hex, target):
+						area.append([h.x, h.y])
 					action_dict["deploy"] = {
 						"type": deploys[i]["type"],
-						"target_hexes": [[target.x, target.y]],
+						"target_hexes": area,
 					}
 			actions.append(action_dict)
 			cur_hex = after_hex
@@ -509,6 +513,18 @@ func get_valid_deploy_targets(robot_id: String, from_hex: Vector2i) -> Array:
 		"extra_moves":
 			result = [from_hex]
 	return result
+
+# Every hex a deploy affects: EMP covers the target and all hexes within 3 of it;
+# Firewall is the line from the robot out to the target, not counting the robot's hex.
+func get_deploy_area(deploy_type: String, from_hex: Vector2i, target: Vector2i) -> Array:
+	match deploy_type:
+		"emp":
+			return HexMath.hexes_in_radius(target, EMP_RADIUS)
+		"firewall":
+			var line = HexMath.hex_line(from_hex, target)
+			line.erase(from_hex)
+			return line
+	return [target]
 
 func validate_plan() -> Array:
 	var errors: Array = []
