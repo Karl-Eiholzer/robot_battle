@@ -94,9 +94,46 @@ This project implements a **turn-based multiplayer game system** with simultaneo
 ### Claude Code Integration
 Claude Code can orchestrate:
 - Code generation for API endpoints and Godot scripts
-- Railway CLI commands for deployment (`railway up`)
+- Branches and pull requests (via `gh`); deploys happen when a PR merges to main
 - Testing and iteration
 - Environment variable configuration
+
+## Git Workflow (Two Developers)
+
+Two developers commit to this repository. Railway deploys whatever lands on `main`
+(backend from `/backend`, web client from `/game_client`), so `main` is production.
+
+**Rules:**
+- **Never push directly to `main`, and never deploy with `railway up`.** Every change reaches `main` through a pull request. `railway up` would deploy local code that the other developer hasn't seen.
+- **Never discard the other developer's work.** No `git reset --hard` or force-push on shared branches. On your own branch, use `--force-with-lease` only, and only after a rebase.
+- **Claude Code opens PRs but does not merge them** unless the user asks it to.
+
+**Starting work:**
+```bash
+git fetch origin
+git status                          # stop and ask if there are uncommitted changes or you're not on main
+git switch main && git pull --ff-only
+git switch -c <topic>               # e.g. fix/blocked-move-retry, feature/player-guide
+```
+
+**Before opening (or updating) a PR:**
+```bash
+git fetch origin
+git rebase origin/main              # resolve conflicts by reading both sides; keep the other developer's intent
+# re-run the relevant tests after the rebase
+git push -u origin <topic>
+gh pr create                        # say what changed, how it was tested, and any deploy notes
+```
+
+**Keep PRs small and complete:**
+- One feature or fix per PR, on a short-lived branch.
+- Changes that must deploy together (for example a backend API change plus the client that uses it) go in the **same PR**, so they reach `main` and Railway at the same time.
+- If `main` moved while the PR was open, rebase onto `origin/main` and re-test before merging.
+
+**After a PR merges:**
+- Check both Railway deploys: `gh api repos/Karl-Eiholzer/robot_battle/commits/<merge-sha>/status`. The status contexts are `marvelous-wholeness - robot_battle` (backend) and `marvelous-wholeness - zonal-recreation` (web client).
+- Run `python test_full_game.py https://robotbattle-production.up.railway.app` against production.
+- Delete the branch.
 
 ## Key Design Decisions
 
@@ -131,14 +168,14 @@ Claude Code can orchestrate:
    - Test endpoints individually
 
 2. **Deployment**
-   - Push backend code to GitHub
-   - Railway auto-deploys
+   - Push a branch and open a pull request (see Git Workflow above)
+   - Railway auto-deploys when the PR merges to main
    - Test with Godot client against production API
 
 3. **Iteration**
    - Use Claude Code to generate/modify code
    - Test locally
-   - Deploy via `railway up` or git push
+   - Open a PR; deploy by merging it
    - Validate with Godot client
 
 ## Security Model
@@ -206,7 +243,7 @@ Read api_architecture.md for complete implementation details
 # Implement Redis connection
 # Build API endpoints following api_architecture.md specifications
 # Test locally with uvicorn
-# Deploy to Railway with `railway up`
+# Open a PR; Railway deploys when it merges to main
 ```
 
 **For Frontend Development:**
@@ -228,7 +265,7 @@ Read godot_architecture.md for implementation patterns
 - **Follow the data models** specified in api_architecture.md (Redis keys)
 - **Use the API endpoint schemas** exactly as documented
 - **Implement error handling** as specified in both documents
-- **Railway CLI** can be used for deployment automation
+- **Deploy only by merging a PR to main** (see Git Workflow); don't use `railway up`
 - **Testing strategy** is outlined in both architecture documents
 
 ## Questions to Resolve During Implementation
