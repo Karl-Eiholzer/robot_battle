@@ -385,23 +385,12 @@ class FullGameTester:
 
         # Calculate adjacent hex toward captain
         def adjacent_step(from_pos, to_pos):
-            """Return adjacent hex step toward target"""
-            dq = to_pos[0] - from_pos[0]
-            dr = to_pos[1] - from_pos[1]
-            # Normalize to adjacent hex (one step)
-            if dq > 0:
-                step_q = 1
-            elif dq < 0:
-                step_q = -1
-            else:
-                step_q = 0
-            if dr > 0:
-                step_r = 1
-            elif dr < 0:
-                step_r = -1
-            else:
-                step_r = 0
-            return [from_pos[0] + step_q, from_pos[1] + step_r]
+            """Return the axial neighbor closest to the target (one hex)"""
+            def dist(a, b):
+                return (abs(a[0] - b[0]) + abs(a[0] + a[1] - b[0] - b[1]) + abs(a[1] - b[1])) // 2
+            neighbors = [[from_pos[0] + dq, from_pos[1] + dr]
+                         for dq, dr in [(1, 0), (-1, 0), (0, 1), (0, -1), (1, -1), (-1, 1)]]
+            return min(neighbors, key=lambda n: dist(n, to_pos))
 
         # Scout submits 4 move actions toward captain (max moves per turn)
         scout_actions = []
@@ -670,10 +659,25 @@ class FullGameTester:
                 }
             }]
 
+            # Scout leaps 2 hexes east (the spawn zone is kept clear of obstacles)
+            scout = next((r for r in robots if r["team"] == 0 and r["type"] == "scout"), None)
+            leap_target = [scout["position"][0] + 2, scout["position"][1]]
+            leap_actions = [{
+                "robot_id": scout["robot_id"],
+                "round_number": 0,
+                "action_type": "move",
+                "before_position": scout["position"],
+                "after_position": leap_target,
+                "deploy": {"type": "leap", "target_hexes": [leap_target]}
+            }]
+
             # Submit for all players
             for p in players:
-                is_captain = (p["id"] == captain["player_id"])
-                actions = emp_actions if is_captain else []
+                actions = []
+                if p["id"] == captain["player_id"]:
+                    actions += emp_actions
+                if p["id"] == scout["player_id"]:
+                    actions += leap_actions
                 self.submit_moves(game_id, 0, actions, p["key"])
 
             results = self.poll_results(game_id, 0, creator_key)
@@ -685,6 +689,17 @@ class FullGameTester:
                     self.log_success(f"EMP covered all {len(emp_objects)} hexes")
                 else:
                     self.log_error(f"EMP created {len(emp_objects)} objects, expected {len(emp_hexes)}")
+
+                self.log_test("Test Scout leap")
+                scout_key = next(p["key"] for p in players if p["id"] == scout["player_id"])
+                scout_view = self.poll_results(game_id, 0, scout_key) or {}
+                leaped = next((r for r in scout_view.get("updated_robots", [])
+                               if r["robot_id"] == scout["robot_id"]), None)
+                if leaped and leaped["position"] == leap_target and leaped["energy"] == scout["energy"] - 1:
+                    self.log_success(f"Scout leaped 2 hexes to {leap_target} for 1 energy")
+                else:
+                    self.log_error(f"Scout leap failed: expected {leap_target} with energy "
+                                   f"{scout['energy'] - 1}, got {leaped}")
             else:
                 self.log_error("Failed to get results after EMP deploy")
         else:

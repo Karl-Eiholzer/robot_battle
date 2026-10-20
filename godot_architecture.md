@@ -213,7 +213,7 @@ enum Phase {
 ```gdscript
 const ROBOT_STATS: Dictionary = {
     "captain":  {moves_per_turn:3, max_energy:2, deploy_type:"emp",         sight_range:5, strength:7},
-    "scout":    {moves_per_turn:4, max_energy:6, deploy_type:"extra_moves", sight_range:7, strength:3},
+    "scout":    {moves_per_turn:4, max_energy:6, deploy_type:"leap"       , sight_range:7, strength:3},
     "defender": {moves_per_turn:2, max_energy:3, deploy_type:"firewall",    sight_range:3, strength:5},
     "engineer": {moves_per_turn:6, max_energy:3, deploy_type:"supply_drop", sight_range:5, strength:0},
 }
@@ -249,7 +249,7 @@ func get_step_issues(robot_id) -> Dictionary  # round -> reason (blocked hex, ov
                                               # no energy, deploy target out of range)
 func find_route(robot_id, dest_hex) -> Array  # BFS over passable hexes within remaining budget
 func count_moves_planned(robot_id) -> int
-func get_max_moves(robot_id) -> int           # base + extra_moves_this_turn (0 if stunned)
+func get_max_moves(robot_id) -> int           # moves_per_turn (0 if stunned); a leap counts as one
 
 # Editing (each emits action_plan_changed)
 func add_move_at_cursor(robot_id, dest_hex) -> bool
@@ -265,7 +265,7 @@ func set_deploy(robot_id, round_num, target_hex) / clear_deploy(robot_id, round_
 
 func start_deploy_targeting(robot_id, round_num) / confirm_deploy_target(hex) / cancel_deploy_targeting()
 func get_valid_deploy_targets(robot_id, from_hex) -> Array
-#   emp: rings 4-6, firewall: ring 4, supply_drop: adjacent, extra_moves: self
+#   emp: rings 4-6, firewall: ring 4, supply_drop: adjacent, leap: open hexes in rings 2-3
 
 func build_submit_payload() -> Array
 # 6 chained RoundAction dicts per robot (same format as before). Each step is

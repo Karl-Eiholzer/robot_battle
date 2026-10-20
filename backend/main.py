@@ -682,12 +682,11 @@ async def process_turn(game_id: str, turn: int):
             redis_client.flip_initiative(game_id)
             redis_client.update_game_state(game_id, "in_progress")
 
-            # Reset extra_moves_this_turn for all robots at start of new turn
+            # Stunned robots recover at the start of each turn
             robots = redis_client.get_robots(game_id)
             if robots:
                 for robot in robots:
-                    robot["extra_moves_this_turn"] = 0
-                    robot["state"] = "active"  # Stunned robots recover each turn
+                    robot["state"] = "active"
                 redis_client.store_robots(game_id, robots)
 
     except Exception as e:

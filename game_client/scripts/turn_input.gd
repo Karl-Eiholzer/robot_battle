@@ -17,6 +17,9 @@ enum Phase {
 
 const ROUNDS_PER_TURN: int = 6
 const EMP_RADIUS: int = 3
+const LEAP_MIN: int = 2
+const LEAP_MAX: int = 3
+const LEAPS_PER_TURN: int = 1
 
 # ==================== State ====================
 
@@ -29,8 +32,9 @@ var view_round: int = -1
 
 # plans: robot_id -> {"steps": Array, "deploys": Dictionary}
 #   steps:   up to ROUNDS_PER_TURN entries, {"type": "move", "dir": 0..5}
-#            (index into HexMath.AXIAL_DIRECTIONS) or {"type": "wait"}.
-#            Rounds at or beyond steps.size() are implicit waits.
+#            (index into HexMath.AXIAL_DIRECTIONS), {"type": "wait"}, or a
+#            Scout's {"type": "leap", "offset": Vector2i} (2-3 hexes, costs a
+#            move and an energy). Rounds at or beyond steps.size() are implicit waits.
 #   deploys: round_idx -> {"type": String, "offset": Vector2i}, target hex
 #            relative to the robot's position at the start of that round.
 var plans: Dictionary = {}
@@ -58,7 +62,7 @@ signal action_plan_changed()
 # Robot type stats matching backend ROBOT_TYPE_STATS
 const ROBOT_STATS: Dictionary = {
 	"captain":  {"moves_per_turn": 3, "max_energy": 2, "deploy_type": "emp",         "sight_range": 5, "strength": 7},
-	"scout":    {"moves_per_turn": 4, "max_energy": 6, "deploy_type": "extra_moves", "sight_range": 7, "strength": 3},
+	"scout":    {"moves_per_turn": 4, "max_energy": 6, "deploy_type": "leap",        "sight_range": 7, "strength": 3},
 	"defender": {"moves_per_turn": 2, "max_energy": 3, "deploy_type": "firewall",    "sight_range": 3, "strength": 5},
 	"engineer": {"moves_per_turn": 6, "max_energy": 3, "deploy_type": "supply_drop", "sight_range": 5, "strength": 0},
 }
@@ -94,7 +98,10 @@ func cancel_deploy_targeting() -> void:
 func confirm_deploy_target(target_hex: Vector2i) -> void:
 	if deploy_target_robot_id == "" or deploy_round < 0:
 		return
-	set_deploy(deploy_target_robot_id, deploy_round, target_hex)
+	if deploy_type == "leap":
+		set_leap(deploy_target_robot_id, deploy_round, target_hex)
+	else:
+		set_deploy(deploy_target_robot_id, deploy_round, target_hex)
 	cancel_deploy_targeting()
 
 # ==================== Robot Selection ====================
@@ -145,13 +152,25 @@ func get_start_hex(robot_id: String) -> Vector2i:
 	var pos = GameState.robot_lookup.get(robot_id, {}).get("position", [0, 0])
 	return Vector2i(int(pos[0]), int(pos[1]))
 
+# Moves and leaps both change hex and count toward the move limit.
+static func is_move_step(step: Dictionary) -> bool:
+	return step.get("type", "wait") in ["move", "leap"]
+
+# How far a step moves the robot (zero for a wait).
+static func step_offset(step: Dictionary) -> Vector2i:
+	match step.get("type", "wait"):
+		"move":
+			return HexMath.AXIAL_DIRECTIONS[step["dir"]]
+		"leap":
+			return step["offset"]
+	return Vector2i.ZERO
+
 # Hex the robot occupies after rounds 0..after_round (-1 = turn start).
 func get_projected_hex(robot_id: String, after_round: int) -> Vector2i:
 	var hex = get_start_hex(robot_id)
 	var steps = get_steps(robot_id)
 	for i in range(mini(after_round + 1, steps.size())):
-		if steps[i].get("type", "wait") == "move":
-			hex += HexMath.AXIAL_DIRECTIONS[steps[i]["dir"]]
+		hex += step_offset(steps[i])
 	return hex
 
 # Array form of get_projected_hex for callers that work with [q, r].
@@ -175,13 +194,19 @@ func get_max_moves(robot_id: String) -> int:
 	if robot.get("state", "active") == "stunned":
 		return 0
 	var robot_type = robot.get("type", "captain")
-	var base_moves = ROBOT_STATS.get(robot_type, {}).get("moves_per_turn", 3)
-	return base_moves + robot.get("extra_moves_this_turn", 0)
+	return ROBOT_STATS.get(robot_type, {}).get("moves_per_turn", 3)
 
 func count_moves_planned(robot_id: String) -> int:
 	var count = 0
 	for step in get_steps(robot_id):
-		if step.get("type", "wait") == "move":
+		if is_move_step(step):
+			count += 1
+	return count
+
+func count_leaps_planned(robot_id: String) -> int:
+	var count = 0
+	for step in get_steps(robot_id):
+		if step.get("type", "wait") == "leap":
 			count += 1
 	return count
 
@@ -206,8 +231,25 @@ func get_step_issues(robot_id: String) -> Dictionary:
 	var steps = get_steps(robot_id)
 	var deploys = get_deploys(robot_id)
 	var energy_left = int(robot.get("energy", 0))
+	var leaps_seen = 0
 
 	for i in range(ROUNDS_PER_TURN):
+		if i < steps.size() and steps[i].get("type", "wait") == "leap":
+			moves_seen += 1
+			leaps_seen += 1
+			energy_left -= 1
+			var landing = hex + steps[i]["offset"]
+			if moves_seen > max_moves:
+				issues[i] = "Over move limit (%d max)" % max_moves
+			elif leaps_seen > LEAPS_PER_TURN:
+				issues[i] = "Only one leap per turn"
+			elif energy_left < 0:
+				issues[i] = "Not enough energy to leap"
+			elif not is_hex_passable(landing):
+				issues[i] = "Can't land on water, forest or off the map"
+			hex = landing
+			continue
+
 		if i in deploys:
 			energy_left -= 1
 			if energy_left < 0:
@@ -277,7 +319,7 @@ func find_route(robot_id: String, dest_hex: Vector2i) -> Array:
 	var moves_after_cursor = 0
 	var steps = get_steps(robot_id)
 	for i in range(r, steps.size()):
-		if steps[i].get("type", "wait") == "move":
+		if is_move_step(steps[i]):
 			moves_after_cursor += 1
 	var budget = mini(
 		get_max_moves(robot_id) - (count_moves_planned(robot_id) - moves_after_cursor),
@@ -329,7 +371,7 @@ func add_route_at_cursor(robot_id: String, route: Array) -> bool:
 		steps.insert(r + i, new_steps[i])
 	# Never silently push planned moves off the end of the turn.
 	for i in range(ROUNDS_PER_TURN, steps.size()):
-		if steps[i].get("type", "wait") == "move":
+		if is_move_step(steps[i]):
 			return false
 	plans[robot_id]["steps"] = steps
 	_shift_deploys(robot_id, r + 1, new_steps.size() - 1)
@@ -350,7 +392,7 @@ func insert_wait(robot_id: String, round_num: int) -> bool:
 	var steps: Array = plans[robot_id]["steps"]
 	var deploys: Dictionary = plans[robot_id]["deploys"]
 	var last = ROUNDS_PER_TURN - 1
-	if (steps.size() > last and steps[last].get("type", "wait") == "move") or last in deploys:
+	if (steps.size() > last and is_move_step(steps[last])) or last in deploys:
 		return false
 	while steps.size() < round_num:
 		steps.append({"type": "wait"})
@@ -420,12 +462,23 @@ func set_deploy(robot_id: String, round_num: int, target_hex: Vector2i) -> void:
 	}
 	action_plan_changed.emit()
 
+# A Scout's leap is its deploy: it replaces the step at round_num.
+func set_leap(robot_id: String, round_num: int, target_hex: Vector2i) -> void:
+	var from_hex = get_projected_hex(robot_id, round_num - 1)
+	_write_step(robot_id, round_num, {"type": "leap", "offset": target_hex - from_hex})
+	cursor_round[robot_id] = round_num + 1
+	action_plan_changed.emit()
+
 func clear_deploy(robot_id: String, round_num: int) -> void:
+	if get_step(robot_id, round_num).get("type", "wait") == "leap":
+		set_wait(robot_id, round_num)
+		return
 	plans[robot_id]["deploys"].erase(round_num)
 	action_plan_changed.emit()
 
 func has_deploy(robot_id: String, round_num: int) -> bool:
-	return round_num in get_deploys(robot_id)
+	return round_num in get_deploys(robot_id) \
+		or get_step(robot_id, round_num).get("type", "wait") == "leap"
 
 func get_deploy_target(robot_id: String, round_num: int) -> Vector2i:
 	var deploy = get_deploys(robot_id).get(round_num, {})
@@ -467,15 +520,25 @@ func build_submit_payload() -> Array:
 		var deploys = get_deploys(robot_id)
 		var moves_left = get_max_moves(robot_id)
 		var energy_left = int(robot.get("energy", 0))
+		var leaps_left = LEAPS_PER_TURN
 		var cur_hex = get_start_hex(robot_id)
 		for i in range(ROUNDS_PER_TURN):
 			var step = get_step(robot_id, i)
 			var after_hex = cur_hex
+			var leaped = false
 			if step.get("type", "wait") == "move" and moves_left > 0:
 				var next_hex = cur_hex + HexMath.AXIAL_DIRECTIONS[step["dir"]]
 				if is_hex_passable(next_hex):
 					after_hex = next_hex
 					moves_left -= 1
+			elif step.get("type", "wait") == "leap" and moves_left > 0 and energy_left > 0 and leaps_left > 0:
+				var landing = cur_hex + step["offset"]
+				if is_hex_passable(landing):
+					after_hex = landing
+					moves_left -= 1
+					energy_left -= 1
+					leaps_left -= 1
+					leaped = true
 			var action_dict: Dictionary = {
 				"robot_id": robot_id,
 				"round_number": i,
@@ -483,6 +546,8 @@ func build_submit_payload() -> Array:
 				"before_position": [cur_hex.x, cur_hex.y],
 				"after_position": [after_hex.x, after_hex.y],
 			}
+			if leaped:
+				action_dict["deploy"] = {"type": "leap", "target_hexes": [[after_hex.x, after_hex.y]]}
 			if i in deploys and energy_left > 0:
 				var target = cur_hex + deploys[i]["offset"]
 				if target in get_valid_deploy_targets(robot_id, cur_hex):
@@ -510,8 +575,12 @@ func get_valid_deploy_targets(robot_id: String, from_hex: Vector2i) -> Array:
 			result.append_array(HexMath.hex_ring(from_hex, 4))
 		"supply_drop":
 			result = HexMath.axial_neighbors(from_hex)
-		"extra_moves":
-			result = [from_hex]
+		"leap":
+			# Straight-line distance 2-3, over anything; only the landing hex must be open
+			for radius in range(LEAP_MIN, LEAP_MAX + 1):
+				for h in HexMath.hex_ring(from_hex, radius):
+					if is_hex_passable(h):
+						result.append(h)
 	return result
 
 # Every hex a deploy affects: EMP covers the target and all hexes within 3 of it;

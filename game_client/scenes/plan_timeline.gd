@@ -177,7 +177,11 @@ func _add_robot_row(robot_id: String, robot: Dictionary, row_name: String, edita
 
 		var bg: Color
 		var text: String
-		if r < steps.size() and steps[r].get("type", "wait") == "move":
+		var is_leap = r < steps.size() and steps[r].get("type", "wait") == "leap"
+		if is_leap:
+			text = "LEAP"
+			bg = COLOR_MOVE
+		elif r < steps.size() and steps[r].get("type", "wait") == "move":
 			text = DIR_NAMES[steps[r]["dir"]]
 			bg = COLOR_MOVE
 		elif r < steps.size():
@@ -186,7 +190,7 @@ func _add_robot_row(robot_id: String, robot: Dictionary, row_name: String, edita
 		else:
 			text = "·"
 			bg = COLOR_EMPTY
-		if TurnInput.has_deploy(robot_id, r):
+		if TurnInput.has_deploy(robot_id, r) and not is_leap:
 			text += " +D"
 		if TurnInput.view_round == r and not r in issues:
 			bg = bg.lerp(COLOR_VIEW_COL, 0.5)

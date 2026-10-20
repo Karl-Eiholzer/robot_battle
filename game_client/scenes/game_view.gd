@@ -408,7 +408,7 @@ func _show_next_step_highlights() -> void:
 # cursor can be replaced, so it doesn't count against the budget).
 func _moves_left_at_cursor(robot_id: String) -> int:
 	var r = TurnInput.get_cursor(robot_id)
-	var replacing = TurnInput.get_step(robot_id, r).get("type", "wait") == "move"
+	var replacing = TurnInput.is_move_step(TurnInput.get_step(robot_id, r))
 	return TurnInput.get_max_moves(robot_id) - TurnInput.count_moves_planned(robot_id) \
 		+ (1 if replacing else 0)
 
@@ -471,6 +471,9 @@ func _update_deploy_button() -> void:
 	if TurnInput.has_deploy(robot_id, r):
 		deploy_btn.disabled = false
 		deploy_btn.text = "Clear Deploy (R%d)  [F]" % (r + 1)
+	elif deploy_type == "leap" and TurnInput.count_leaps_planned(robot_id) >= TurnInput.LEAPS_PER_TURN:
+		deploy_btn.disabled = true
+		deploy_btn.text = "Leap used this turn"
 	elif int(robot.get("energy", 0)) <= 0:
 		deploy_btn.disabled = true
 		deploy_btn.text = "Deploy %s (no energy)" % deploy_type
@@ -497,13 +500,19 @@ func _start_deploy(robot_id: String, round_num: int) -> void:
 
 	var from_hex = TurnInput.get_projected_hex(robot_id, round_num - 1)
 	var deploy_type_local = TurnInput.get_deploy_type(robot_id)
-	if deploy_type_local == "extra_moves":
-		# No targeting needed — self-applied
-		TurnInput.set_deploy(robot_id, round_num, from_hex)
-		return
+	if deploy_type_local == "leap":
+		if TurnInput.count_leaps_planned(robot_id) >= TurnInput.LEAPS_PER_TURN:
+			hint_label.text = "A Scout can leap once per turn. Clear the other leap first."
+			return
+		if _moves_left_at_cursor(robot_id) <= 0 and round_num == TurnInput.get_cursor(robot_id):
+			hint_label.text = "No moves left this turn; a leap uses one."
+			return
 
-	TurnInput.set_view_round(round_num)
 	var targets = TurnInput.get_valid_deploy_targets(robot_id, from_hex)
+	if targets.is_empty():
+		hint_label.text = "Nowhere to %s from here." % deploy_type_local
+		return
+	TurnInput.set_view_round(round_num)
 	hex_map.highlight_hexes(targets, Color(0.8, 0.4, 1.0, 0.6))
 	TurnInput.start_deploy_targeting(robot_id, round_num)
 	_set_deploy_focus(targets[0])
@@ -632,7 +641,7 @@ func _open_step_menu(robot_id: String, round_num: int, screen_pos: Vector2) -> v
 
 	_step_menu.clear()
 	_step_menu.add_separator("Round %d" % (round_num + 1))
-	if step.get("type", "wait") == "move" or not has_step:
+	if TurnInput.is_move_step(step) or not has_step:
 		_step_menu.add_item("Wait this round", MenuItem.WAIT)
 	_step_menu.add_item("Insert wait before (shift later steps)", MenuItem.INSERT_WAIT)
 	if has_step:
@@ -882,6 +891,7 @@ func _on_phase_changed(new_phase: TurnInput.Phase) -> void:
 			_refresh_plan_view()
 		TurnInput.Phase.DEPLOY_TARGETING:
 			submit_btn.disabled = true
+			hex_map.clear_adjacent_highlights()
 		TurnInput.Phase.SUBMITTING:
 			submit_btn.disabled = true
 		TurnInput.Phase.GAME_OVER:

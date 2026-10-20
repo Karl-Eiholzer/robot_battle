@@ -163,7 +163,7 @@ Animations may be of the following types for each round: "Stunned", "Waiting", "
 * Moves actions per turn: 4
 * Starting number of energy points: set by variable
 * Maximum Energy: 6
-* Type of Deployment Action: **Extra Moves**
+* Type of Deployment Action: **Leap** (move 2-3 hexes over obstacles; once per turn; counts as a move)
 * Sight Range: 7 hexes
 * Team Order: 3
 * Strength: 3

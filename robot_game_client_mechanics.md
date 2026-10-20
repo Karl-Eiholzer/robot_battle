@@ -80,7 +80,7 @@ The game view screen is divided into three areas:
 
 **Timeline Dock size:** the dock sizes itself to its contents in the bottom-left corner. **T** (or the Hide/Show plan button) collapses it so robots underneath can be clicked.
 
-**Deploy:** press **F** or the Deploy button (applies to the cursor round), or use "Deploy here" in the step menu. Purple hexes show valid targets; click one to confirm, or press **Esc** / right-click to cancel. Extra Moves applies immediately.
+**Deploy:** press **F** or the Deploy button (applies to the cursor round), or use "Deploy here" in the step menu. Purple hexes show valid targets; click one to confirm, or press **Esc** / right-click to cancel. A Scout's Leap replaces the step in that round.
 
 **Keyboard-only play:** every action has a key.
 
@@ -220,7 +220,7 @@ After robots are spawned:
 * Moves actions per turn: 4
 * Starting number of energy points: set by variable
 * Maximum Energy: 6
-* Type of Deployment Action: **Extra Moves**
+* Type of Deployment Action: **Leap**
 * Sight Range: 7 hexes
 * Team Order: 3
 
@@ -292,9 +292,12 @@ Action required by player when using the "deploy" action
 4. List of EMP hexes sent to backend processing API as part of "turn" submission
 5. Effects handled by backend processing
 
-### **Extra Moves**
-1. Activate.
-2. Effect handles immediately by Godot game client: makes 2 additional move actions available for Robot to use that turn
+### **Leap**
+1. User selects a target hex 2 or 3 hexes away from the Scout in a straight line (based on where the Scout is at the beginning of the "round"), ignoring anything in between: water, forest, firewalls and robots
+2. The target hex cannot be water, forest or off the map
+3. The leap replaces that round's step and counts as one of the Scout's move actions; at most one leap per turn
+4. Sent to the backend as a "move" action whose after_position is the landing hex, with deploy `{"type": "leap", "target_hexes": [landing hex]}`
+5. Backend resolves the landing like any move (bump, power move, capture). Energy is spent only when the leap succeeds; a blocked leap retries next round
 
 ### **Firewall**
 1. User selects a target hex 4 hexes away from the Robot in a straight line (based on where the Robot is at the beginning of the "round")
