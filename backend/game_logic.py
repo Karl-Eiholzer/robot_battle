@@ -179,6 +179,27 @@ def process_deploy_action(
 
 # ==================== Core Turn Processing ====================
 
+def _object_at(hex_objects: List[Dict], position: List[int], obj_type: str) -> Optional[Dict]:
+    return next((o for o in hex_objects
+                 if o["position"] == position and o["type"] == obj_type), None)
+
+
+def _trigger_firewall(robot: Dict, position: List[int], hex_objects: List[Dict],
+                      hex_objects_destroyed: List[Dict]) -> bool:
+    """
+    If a firewall piece is on position, it burns out and the robot is sent to its
+    spawn hex, stunned. Hits either team. Returns True if the robot was caught.
+    """
+    firewall = _object_at(hex_objects, position, "firewall")
+    if firewall is None:
+        return False
+    hex_objects_destroyed.append(firewall)
+    hex_objects[:] = [o for o in hex_objects if o is not firewall]
+    robot["position"] = robot["spawn_position"][:]
+    robot["state"] = "stunned"
+    return True
+
+
 def process_robot_action(
     robot: Dict,
     action: Dict,
@@ -222,22 +243,11 @@ def process_robot_action(
                 return robot, "Stunned", "stunned"
 
     if action_type == "wait":
-        # Check hex objects at current position
-        obj_at_pos = None
-        for obj in hex_objects:
-            if obj["position"] == before_pos:
-                obj_at_pos = obj
-                break
-
-        if obj_at_pos and obj_at_pos["type"] == "firewall":
+        if _trigger_firewall(robot, before_pos, hex_objects, hex_objects_destroyed):
             # Case 2: Wait + Firewall - destroy firewall, stun, send to spawn
-            hex_objects_destroyed.append(obj_at_pos)
-            hex_objects[:] = [o for o in hex_objects if o is not obj_at_pos]
-            robot["position"] = robot["spawn_position"][:]
-            robot["state"] = "stunned"
             return robot, "Stunned", "stunned"
 
-        elif obj_at_pos and obj_at_pos["type"] == "emp":
+        elif _object_at(hex_objects, before_pos, "emp"):
             # Case 3: Wait + EMP - stun in place
             robot["state"] = "stunned"
             return robot, "Stunned", "stunned"
@@ -251,6 +261,18 @@ def process_robot_action(
             return robot, "Waiting", "success"
 
     elif action_type == "move":
+        # Entering a firewall hex (by step, or by a Scout landing a leap) burns that
+        # piece and sends the robot home. A leap passes over everything in between.
+        def caught_by_firewall() -> bool:
+            if _object_at(hex_objects, after_pos, "firewall") is None:
+                return False
+            if deploy and deploy.get("type") == "leap":
+                # The leap happened, so it still costs its energy
+                process_deploy_action(game_id=None, robot=robot, deploy=deploy,
+                                      current_turn=current_turn,
+                                      hex_objects_created=hex_objects_created)
+            return _trigger_firewall(robot, after_pos, hex_objects, hex_objects_destroyed)
+
         # Find robot at target position
         target_robot = get_robot_at_position(all_robots, after_pos)
 
@@ -259,6 +281,10 @@ def process_robot_action(
             if is_hex_obstructed(map_data, after_pos):
                 # Case 10: Move to obstacle
                 return robot, "Bump", "error"
+
+            if caught_by_firewall():
+                # Case 13: Move into firewall - burn it, stun, send to spawn
+                return robot, "Stunned", "stunned"
 
             # Check for supply drop at target
             supply_obj = next((o for o in hex_objects
@@ -305,6 +331,9 @@ def process_robot_action(
                     # Enemy robot gets stunned and sent to spawn
                     target_robot["position"] = target_robot["spawn_position"][:]
                     target_robot["state"] = "stunned"
+                    if caught_by_firewall():
+                        # Case 13 after a push: the hex was also a firewall
+                        return robot, "Stunned", "stunned"
                     robot["position"] = after_pos[:]
                     if deploy:
                         process_deploy_action(game_id=None, robot=robot, deploy=deploy,

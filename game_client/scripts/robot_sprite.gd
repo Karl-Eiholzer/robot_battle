@@ -120,6 +120,18 @@ func animate_bump(push_direction_pixel: Vector2, duration: float = 0.2) -> void:
 	tween.tween_property(self, "position", bump_pos, duration * 0.4)
 	tween.tween_property(self, "position", start_pos, duration * 0.6)
 
+# Step onto via_pixel (e.g. a firewall), vanish back to home_pixel, then flash stunned.
+func animate_sent_home(from_pixel: Vector2, via_pixel: Vector2, home_pixel: Vector2,
+		duration: float = 0.4) -> void:
+	position = from_pixel
+	var tween = create_tween()
+	if via_pixel != from_pixel:
+		tween.tween_property(self, "position", via_pixel, duration * 0.5)
+	tween.tween_property(self, "modulate:a", 0.0, duration * 0.25)
+	tween.tween_callback(func(): position = home_pixel)
+	tween.tween_property(self, "modulate:a", 1.0, duration * 0.25)
+	tween.tween_callback(show_stunned_flash)
+
 func show_stunned_flash() -> void:
 	is_stunned = true
 	queue_redraw()

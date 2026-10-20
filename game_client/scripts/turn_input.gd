@@ -217,6 +217,31 @@ func is_hex_passable(hex: Vector2i) -> bool:
 			_passable_cache[coord] = hex_data.get("passable", true)
 	return _passable_cache.get(hex, false)  # Off the map = obstructed (matches backend is_hex_obstructed)
 
+# Firewalls on the board as of turn start (deployed this turn ones aren't known yet).
+func is_firewall_hex(hex: Vector2i) -> bool:
+	for obj in GameState.hex_objects:
+		var pos = obj.get("position", [0, 0])
+		if obj.get("type", "") == "firewall" and Vector2i(int(pos[0]), int(pos[1])) == hex:
+			return true
+	return false
+
+# Round index -> warning for steps that end on a known firewall (entering one by
+# step or leap landing, or waiting on one): the robot would be sent home stunned.
+# Unlike get_step_issues these are legal and are submitted as planned.
+func get_firewall_warnings(robot_id: String) -> Dictionary:
+	var warnings: Dictionary = {}
+	var hex = get_start_hex(robot_id)
+	var steps = get_steps(robot_id)
+	for i in range(ROUNDS_PER_TURN):
+		var step = get_step(robot_id, i)
+		hex += step_offset(step)
+		if is_firewall_hex(hex):
+			warnings[i] = "Firewall: this robot would be sent home stunned"
+			break  # A caught robot does nothing more this turn
+		if i >= steps.size():
+			break  # Implicit waits from here on; one warning is enough
+	return warnings
+
 static func direction_between(from_hex: Vector2i, to_hex: Vector2i) -> int:
 	return HexMath.AXIAL_DIRECTIONS.find(to_hex - from_hex)
 
@@ -334,7 +359,8 @@ func find_route(robot_id: String, dest_hex: Vector2i) -> Array:
 		for hex in frontier:
 			for d in HexMath.AXIAL_DIRECTIONS:
 				var n = hex + d
-				if n in came_from or not is_hex_passable(n):
+				# Route around firewalls; only end on one if it was clicked deliberately
+				if n in came_from or not is_hex_passable(n) or (is_firewall_hex(n) and n != dest_hex):
 					continue
 				came_from[n] = hex
 				if n == dest_hex:

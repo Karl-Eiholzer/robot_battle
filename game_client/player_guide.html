@@ -264,7 +264,7 @@
 			<p><strong>Movement:</strong> up to 4 moves per turn, and one of them can be a leap. Scouts have the <strong>longest sight range</strong>, which makes them your eyes on the battlefield. They are fairly weak: they can push an Engineer aside, but Defenders and Captains will knock them back.</p>
 			<div class="ability">
 				<h4>Special ability: Leap</h4>
-				<p>Jumps <strong>2 or 3 hexes in a single move</strong>, straight over anything in between: water, forest, firewalls and other robots.</p>
+				<p>Jumps <strong>2 or 3 hexes in a single move</strong>, straight over anything in between: water, forest, firewalls and other robots. It's the only safe way past a firewall, but landing on a firewall hex still triggers it.</p>
 				<ul>
 					<li>Press <em>Deploy</em> (or F), then pick one of the purple hexes. They are every open hex 2 or 3 away. The Scout can't land on water or forest.</li>
 					<li>A leap costs <strong>1 energy</strong> and counts as <strong>one of the Scout's 4 moves</strong>. A Scout can leap <strong>once per turn</strong>.</li>
@@ -294,9 +294,10 @@
 				<h4>Special ability: Firewall</h4>
 				<p>Lays a firewall in a <strong>straight line of 4 hexes</strong> running out from the Defender.</p>
 				<ul>
-					<li>Any robot that <strong>waits</strong> on a firewall hex is <strong>sent back to its starting hex and stunned</strong>. That piece of firewall burns out after it catches someone.</li>
-					<li>Robots that only pass through are not affected.</li>
-					<li>It affects <strong>your own robots too</strong>.</li>
+					<li>Any robot that <strong>steps onto</strong> a firewall hex, or <strong>waits</strong> on one, is <strong>sent back to its starting hex and stunned</strong>. That piece of firewall burns out after it catches someone; the rest of the line stays.</li>
+					<li>Firewalls are <strong>permanent</strong>. A piece stays on the map until it catches a robot.</li>
+					<li>It affects <strong>your own robots too</strong>. A leaping Scout can jump over it safely, but landing on it counts.</li>
+					<li>A new firewall becomes active from the round after it's placed.</li>
 				</ul>
 			</div>
 		</article>
@@ -373,9 +374,9 @@
 				<p>Because stunned robots don't block, a robot can end up in the same hex as an enemy. When the weaker one next acts, it is sent back to its starting hex and stunned.</p>
 			</div>
 			<div class="ko-card">
-				<h3>3. Waiting on a Firewall</h3>
+				<h3>3. Entering a Firewall</h3>
 				<p><span class="tag home">Sent home + stunned</span></p>
-				<p>A robot that <strong>waits</strong> on a firewall hex is sent back to its starting hex and stunned. That piece of firewall is used up. Moving through it is safe.</p>
+				<p>A robot that <strong>steps onto</strong> a firewall hex, or <strong>waits</strong> on one, is sent back to its starting hex and stunned. That piece of firewall is used up. Only a Scout leaping over it gets past safely. When you plan a path onto a known firewall, the robot card warns you.</p>
 			</div>
 			<div class="ko-card">
 				<h3>4. Waiting in an EMP</h3>

@@ -576,7 +576,15 @@ func animate_replay_round(round_replays: Array, hex_objects_created: Array,
 				else:
 					sprite.animate_bump((target_pixel - from_pixel).normalized(), 0.2)
 			"Stunned":
-				sprite.show_stunned_flash()
+				if to_hex != from_hex:
+					# Sent home (firewall, or standing on a stronger enemy)
+					var via = robot_replay.get("target_position", before_pos)
+					var via_pixel = HexMath.axial_to_pixel(Vector2i(int(via[0]), int(via[1])), HEX_SIZE)
+					sprite.animate_sent_home(from_pixel, via_pixel, to_pixel)
+				else:
+					# Already stunned this turn; make sure it's drawn where it is (e.g. pushed home)
+					sprite.position = to_pixel
+					sprite.show_stunned_flash()
 			"Waiting", "Puzzled":
 				pass
 
