@@ -222,13 +222,14 @@ func update_plan_display(selected_robot_id: String, view_round: int) -> void:
 		var issue_hexes: Array = []
 		var deploys: Array = []
 		for i in range(steps.size()):
-			if TurnInput.has_deploy(robot_id, i):
+			if i in TurnInput.get_deploys(robot_id):
 				deploys.append(_deploy_marker(robot_id, i))
 			var label: String
-			if steps[i].get("type", "wait") == "move":
-				hex += HexMath.AXIAL_DIRECTIONS[steps[i]["dir"]]
+			if TurnInput.is_move_step(steps[i]):
+				hex += TurnInput.step_offset(steps[i])
 				points.append(HexMath.axial_to_pixel(hex, HEX_SIZE))
-				label = str(i + 1)
+				# L3 = landed here by a leap in round 3
+				label = ("L%d" if steps[i].get("type", "wait") == "leap" else "%d") % (i + 1)
 			else:
 				label = "w%d" % (i + 1)
 			if not labels.has(hex):
@@ -238,7 +239,7 @@ func update_plan_display(selected_robot_id: String, view_round: int) -> void:
 				issue_hexes.append(hex)
 		# Deploys can be planned on implicit-wait rounds past the last step.
 		for i in range(steps.size(), TurnInput.ROUNDS_PER_TURN):
-			if TurnInput.has_deploy(robot_id, i):
+			if i in TurnInput.get_deploys(robot_id):
 				deploys.append(_deploy_marker(robot_id, i))
 				if i in issues:
 					issue_hexes.append(hex)

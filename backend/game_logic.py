@@ -171,9 +171,8 @@ def process_deploy_action(
             }
             hex_objects_created.append(obj)
 
-    elif deploy_type == "extra_moves":
-        # Extra moves are handled client-side; server just records energy cost
-        robot["extra_moves_this_turn"] = robot.get("extra_moves_this_turn", 0) + 2
+    # "leap" needs nothing more: the move itself carries the Scout 2-3 hexes, and
+    # this only runs when that move succeeds, so a blocked leap costs no energy.
 
     return True
 
@@ -807,8 +806,7 @@ def spawn_robots_for_game(
                         "position": spawn_pos[:],
                         "energy": energy,
                         "state": "active",
-                        "spawn_position": spawn_pos[:],
-                        "extra_moves_this_turn": 0
+                        "spawn_position": spawn_pos[:]
                     }
                     all_robots.append(robot)
 
@@ -864,6 +862,8 @@ def validate_player_actions(
         errors.append("No robots found for this player")
         return errors
 
+    map_data = redis_client.get_game_map(game_id) if game_id else None
+
     # Group actions by robot_id
     robot_actions: Dict[str, List[Dict]] = {}
     for action in actions:
@@ -885,7 +885,7 @@ def validate_player_actions(
 
         # Count move actions
         move_count = sum(1 for a in robot_action_list if a.get("action_type") == "move")
-        max_moves = stats.moves_per_turn + robot.get("extra_moves_this_turn", 0)
+        max_moves = stats.moves_per_turn
         if move_count > max_moves:
             errors.append(
                 f"Robot {robot_id} ({robot['type']}) has {move_count} move actions "
@@ -913,11 +913,32 @@ def validate_player_actions(
                 f"Robot {robot_id} has {robot['energy']} energy but {deploy_count} deploy actions"
             )
 
+        # A move is one hex, except a Scout's leap (its geometry is checked with the deploy)
+        leap_count = 0
+        for action in robot_action_list:
+            before = action.get("before_position")
+            after = action.get("after_position")
+            if (action.get("deploy") or {}).get("type") == "leap":
+                leap_count += 1
+                if map_data and after is not None and is_hex_obstructed(map_data, after):
+                    errors.append(f"Robot {robot_id} can't leap onto water, forest or off the map")
+            elif action.get("action_type") == "move" and before is not None and after is not None:
+                if hex_distance(before, after) != 1:
+                    errors.append(
+                        f"Robot {robot_id} round {action.get('round_number')} moves "
+                        f"{hex_distance(before, after)} hexes (a move is 1)"
+                    )
+        if leap_count > LEAPS_PER_TURN:
+            errors.append(f"Robot {robot_id} can leap only {LEAPS_PER_TURN} time per turn")
+
     return errors
 
 
 EMP_RADIUS = 3
 FIREWALL_LENGTH = 4
+LEAP_MIN = 2
+LEAP_MAX = 3
+LEAPS_PER_TURN = 1
 
 
 def validate_deploy_area(robot_id: str, action: Dict, deploy: Dict) -> List[str]:
@@ -950,6 +971,12 @@ def validate_deploy_area(robot_id: str, action: Dict, deploy: Dict) -> List[str]
     if deploy_type == "supply_drop":
         if len(hexes) != 1 or hex_distance(origin, hexes[0]) != 1:
             return [f"Robot {robot_id} Supply Drop must target one adjacent hex"]
+
+    if deploy_type == "leap":
+        after = action.get("after_position")
+        if (action.get("action_type") != "move" or hexes != [after]
+                or not LEAP_MIN <= hex_distance(origin, after) <= LEAP_MAX):
+            return [f"Robot {robot_id} leap must move {LEAP_MIN}-{LEAP_MAX} hexes to its target hex"]
 
     return []
 

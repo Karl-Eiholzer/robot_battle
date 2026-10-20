@@ -115,7 +115,7 @@ Sent at game creation; stored in `game:{game_id}:variables`.
 | type | moves/turn | max_energy | deploy | sight | strength |
 |------|-----------|------------|--------|-------|----------|
 | captain | 3 | 2 | emp | 5 | 7 |
-| scout | 4 | 6 | extra_moves | 7 | 3 |
+| scout | 4 | 6 | leap | 7 | 3 |
 | defender | 2 | 3 | firewall | 3 | 5 |
 | engineer | 6 | 3 | supply_drop | 5 | 0 |
 
@@ -151,8 +151,7 @@ Roles determine which robot types a player controls.
   "position": [3, -1],         // [q, r] axial coordinates
   "energy": 2,
   "state": "active",           // "active" or "stunned"
-  "spawn_position": [1, -1],
-  "extra_moves_this_turn": 0   // reset to 0 at start of each turn
+  "spawn_position": [1, -1]
 }
 ```
 
@@ -175,7 +174,7 @@ One round's action for one robot. Players submit 6 of these per robot per turn.
 
 ```json
 {
-  "type": "emp",                    // emp, firewall, supply_drop, extra_moves
+  "type": "emp",                    // emp, firewall, supply_drop, leap
   "target_hexes": [[7, -2]]
 }
 ```
@@ -184,7 +183,7 @@ Deploy ranges:
 - `emp` (Captain): hexes 4-6 away — stuns robots caught in blast
 - `firewall` (Defender): hexes ~4 away — places blocking hex object
 - `supply_drop` (Engineer): adjacent hex — restores energy to nearby robots
-- `extra_moves` (Scout): self — grants additional moves this turn, no targeting
+- `leap` (Scout): hexes 2-3 away, not water/forest — the move action itself carries the Scout there (`after_position` = target); once per turn, counts as a move, energy spent only if it lands
 
 ### HexObject
 
@@ -391,7 +390,7 @@ Any player can call this once both teams are ready.
 - Calls `spawn_robots_for_game()` which places robots at spawn positions on the map
 - Calls `store_robots()` and `store_hex_objects([], ...)` (starts empty)
 - Sets game state to `in_progress`
-- Robots recover `state="active"` and `extra_moves_this_turn=0` at the start of each turn
+- Robots recover `state="active"` at the start of each turn
 
 ---
 
@@ -421,8 +420,7 @@ Requires authentication. Returns the full starting view for the requesting playe
       "position": [2, -1],
       "energy": 2,
       "state": "active",
-      "spawn_position": [2, -1],
-      "extra_moves_this_turn": 0
+      "spawn_position": [2, -1]
     }
   ],
   "other_robots": [
@@ -575,7 +573,6 @@ async def process_turn(game_id: str, turn: int):
         redis_client.update_game_state(game_id, "in_progress")
         # Reset per-turn robot fields
         for robot in redis_client.get_robots(game_id):
-            robot["extra_moves_this_turn"] = 0
             robot["state"] = "active"     # stunned robots recover
         redis_client.store_robots(game_id, robots)
 ```

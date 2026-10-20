@@ -8,7 +8,7 @@ class RobotTypeStats(BaseModel):
     """Stats for a robot type"""
     moves_per_turn: int
     max_energy: int
-    deploy_type: str  # emp, firewall, supply_drop, extra_moves
+    deploy_type: str  # emp, firewall, supply_drop, leap
     sight_range: int
     team_order: int
     strength: int
@@ -26,7 +26,7 @@ ROBOT_TYPE_STATS: Dict[str, RobotTypeStats] = {
     "scout": RobotTypeStats(
         moves_per_turn=4,
         max_energy=6,
-        deploy_type="extra_moves",
+        deploy_type="leap",
         sight_range=7,
         team_order=3,
         strength=3
@@ -97,13 +97,11 @@ class Robot(BaseModel):
     energy: int
     state: str = "active"  # active, stunned
     spawn_position: List[int]  # [q, r] starting position
-    # Extra moves granted by Scout deploy this turn
-    extra_moves_this_turn: int = 0
 
 
 class DeployAction(BaseModel):
     """A deploy action attached to a robot's round action"""
-    type: str  # emp, firewall, supply_drop, extra_moves
+    type: str  # emp, firewall, supply_drop, leap
     target_hexes: List[List[int]] = Field(default_factory=list)  # list of [q, r]
 
 
