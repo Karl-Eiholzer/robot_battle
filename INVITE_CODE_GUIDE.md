@@ -35,25 +35,25 @@
 │ Creator: POST /game/create                              │
 │ Response: {                                             │
 │   game_id: "game_abc123"                                │
-│   team_0_invite_code: "golden-dragon-castle"            │
-│   team_1_invite_code: "swift-tiger-moon"                │
+│   team_0_invite_code: "golden-dragon"                   │
+│   team_1_invite_code: "swift-tiger"                     │
 │ }                                                        │
 └─────────────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
 │ Creator shares TWO codes with SPECIFIC groups:          │
-│ To teammates: "Join Team 0: golden-dragon-castle"       │
-│ To opponents: "Join Team 1: swift-tiger-moon"           │
+│ To teammates: "Join Team 0: golden-dragon"              │
+│ To opponents: "Join Team 1: swift-tiger"                │
 └─────────────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
 │ Players join their assigned team:                       │
-│  - Friend1: Uses "golden-dragon-castle" → Team 0        │
-│  - Friend2: Uses "golden-dragon-castle" → Team 0        │
-│  - Enemy1:  Uses "swift-tiger-moon" → Team 1            │
-│  - Enemy2:  Uses "swift-tiger-moon" → Team 1            │
+│  - Friend1: Uses "golden-dragon" → Team 0               │
+│  - Friend2: Uses "golden-dragon" → Team 0               │
+│  - Enemy1:  Uses "swift-tiger" → Team 1                 │
+│  - Enemy2:  Uses "swift-tiger" → Team 1                 │
 └─────────────────────────────────────────────────────────┘
                           │
                           ▼
@@ -63,20 +63,20 @@
 
 ## Example Invite Codes
 
-The system generates memorable 3-word codes:
+The system generates memorable 2-word codes:
 
 ```
 ✨ Team 0 (Your Team):
-   - golden-dragon-castle
-   - cosmic-phoenix-nexus
-   - swift-laser-fortress
-   - mystic-wolf-vault
+   - golden-dragon
+   - cosmic-phoenix
+   - swift-fortress
+   - mystic-wolf
 
 🔥 Team 1 (Opponents):
-   - shadow-tiger-moon
-   - neon-rocket-tower
-   - crystal-falcon-grid
-   - thunder-shark-portal
+   - shadow-tiger
+   - neon-rocket
+   - crystal-falcon
+   - thunder-shark
 ```
 
 ## API Endpoint Changes
@@ -91,8 +91,8 @@ POST /game/create
   "game_id": "game_abc123",
   "creator_player_id": "player_xyz",
   "api_key": "key_...",
-  "team_0_invite_code": "golden-dragon-castle",  ← NEW
-  "team_1_invite_code": "swift-tiger-moon",       ← NEW
+  "team_0_invite_code": "golden-dragon",  ← NEW
+  "team_1_invite_code": "swift-tiger",       ← NEW
   "state": "waiting_for_players",
   "max_players": 4,
   "team": 0
@@ -150,11 +150,11 @@ Response (team now determined by code):
 │ [Join Game]                      │
 │                                  │
 │ Team 0 Code (Your Team):         │
-│ golden-dragon-castle             │
+│ golden-dragon                    │
 │ [Copy Team 0 Code]               │
 │                                  │
 │ Team 1 Code (Opponents):         │
-│ swift-tiger-moon                 │
+│ swift-tiger                      │
 │ [Copy Team 1 Code]               │
 └─────────────────────────────────┘
 ```
@@ -169,7 +169,7 @@ Response (team now determined by code):
 5. Wait for players to join
 
 ### Joiner Workflow
-1. Receive invite code from friend (e.g., "golden-dragon-castle")
+1. Receive invite code from friend (e.g., "golden-dragon")
 2. Paste code into "Invite Code" field
 3. Click "Join Game"
 4. Automatically assigned to correct team
@@ -188,14 +188,14 @@ Response (team now determined by code):
 ## Code Format Rules
 
 ✅ **Valid Examples:**
-- `golden-dragon-castle` (all lowercase, 3 words, hyphens)
-- `swift-tiger-moon`
-- `crystal-falcon-grid`
+- `golden-dragon` (all lowercase, 2 words, hyphen)
+- `swift-tiger`
+- `crystal-falcon`
 
 ❌ **Invalid Examples:**
-- `GoldenDragonCastle` (not lowercase)
-- `golden_dragon_castle` (underscores instead of hyphens)
-- `golden-dragon` (only 2 words)
+- `GoldenDragon` (not lowercase)
+- `golden_dragon` (underscores instead of hyphens)
+- `golden-dragon` (3 words; codes are 2 words now)
 - `game_abc123` (not word-based)
 
 ## Testing Examples
@@ -208,16 +208,16 @@ curl -X POST http://localhost:8000/game/create \
   -d '{"max_players": 4, "map_config": {"width": 15, "height": 15}, "game_variables": {"team_size": 2}}'
 
 # Response shows:
-# "team_0_invite_code": "golden-dragon-castle"
-# "team_1_invite_code": "swift-tiger-moon"
+# "team_0_invite_code": "golden-dragon"
+# "team_1_invite_code": "swift-tiger"
 
 # 2. Join team 0
-curl -X POST http://localhost:8000/game/invite/golden-dragon-castle/join \
+curl -X POST http://localhost:8000/game/invite/golden-dragon/join \
   -H "Content-Type: application/json" \
   -d '{"player_name": "Alice"}'
 
 # 3. Join team 1
-curl -X POST http://localhost:8000/game/invite/swift-tiger-moon/join \
+curl -X POST http://localhost:8000/game/invite/swift-tiger/join \
   -H "Content-Type: application/json" \
   -d '{"player_name": "Bob"}'
 ```
@@ -266,7 +266,6 @@ print(f"Bob joined as Team {resp.json()['team']}")  # Should be 1
 The system uses curated word lists for code generation:
 
 - **Adjectives (47)**: ancient, brave, cosmic, electric, golden, mystic, shadow, swift, etc.
-- **Nouns (46)**: apex, dragon, eagle, falcon, hunter, phoenix, robot, tiger, wolf, etc.
-- **Objects (39)**: castle, citadel, fortress, galaxy, grid, nexus, portal, tower, vault, etc.
+- **Nouns (82)**: apex, castle, dragon, eagle, falcon, fortress, galaxy, phoenix, tiger, wolf, etc.
 
-Total combinations: 47 × 46 × 39 = **84,318 unique codes**
+Total combinations: 47 × 82 = **3,854 unique codes**

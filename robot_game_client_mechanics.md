@@ -128,14 +128,14 @@ When Timer 3 elapses, the game auto-submits the set of actions for the player. N
 
 ### How Invite Codes Work
 
-When a game is created, the backend generates two unique 3-word codes:
-- **Format:** `adjective-noun-object` (e.g., `golden-dragon-castle`)
+When a game is created, the backend generates two unique 2-word codes:
+- **Format:** `adjective-noun` (e.g., `golden-dragon`)
 - **Team 0 Code:** Determines Team 0 membership
 - **Team 1 Code:** Determines Team 1 membership
 
 **Key Features:**
 - Memorable and easy to share verbally or via text
-- ~84,000 possible unique combinations
+- ~3,850 possible unique combinations
 - Auto-expire when the game ends
 - Cannot be reused across different games
 
@@ -149,19 +149,19 @@ The creator controls who plays on which team by deciding who gets which code:
 
 **Creator (Alice):**
 1. Creates game → receives codes:
-   - Team 0: `swift-laser-fortress`
-   - Team 1: `shadow-tiger-moon`
-2. Texts Bob: "Join Team 0: swift-laser-fortress"
-3. Tells Carol: "Join Team 1: shadow-tiger-moon"
+   - Team 0: `swift-fortress`
+   - Team 1: `shadow-tiger`
+2. Texts Bob: "Join Team 0: swift-fortress"
+3. Tells Carol: "Join Team 1: shadow-tiger"
 
 **Bob (Teammate):**
 1. Enters name: "Bob"
-2. Pastes: `swift-laser-fortress`
+2. Pastes: `swift-fortress`
 3. Joins as Team 0 ✓
 
 **Carol (Opponent):**
 1. Enters name: "Carol"
-2. Pastes: `shadow-tiger-moon`
+2. Pastes: `shadow-tiger`
 3. Joins as Team 1 ✓
 
 ## **Game Start**
