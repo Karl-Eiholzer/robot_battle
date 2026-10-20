@@ -1,6 +1,6 @@
 """
 Invite code generation for game joining.
-Generates memorable 3-word codes like "forest-tiger-moon".
+Generates memorable 2-word codes like "golden-dragon".
 """
 import random
 from typing import TYPE_CHECKING
@@ -18,28 +18,25 @@ ADJECTIVES = [
     "turbo", "ultra", "velvet", "violet", "wild", "winter", "zen"
 ]
 
+# Every noun pairs with every adjective (~3,850 codes); none repeats an adjective
 NOUNS = [
-    "apex", "arrow", "atom", "bear", "blade", "comet", "crown", "delta",
-    "dragon", "eagle", "echo", "falcon", "flame", "ghost", "hawk", "hunter",
-    "knight", "laser", "lion", "lunar", "mech", "nebula", "ninja", "omega",
-    "phoenix", "pixel", "prism", "pulse", "quest", "raven", "rebel", "rocket",
-    "saber", "scout", "shark", "signal", "spark", "star", "surge", "titan",
-    "tiger", "viper", "volt", "wave", "wolf", "zero"
-]
-
-OBJECTS = [
-    "atlas", "beacon", "castle", "cipher", "circuit", "citadel", "code", "core",
-    "cosmos", "crystal", "engine", "fortress", "galaxy", "grid", "haven", "horizon",
-    "island", "matrix", "moon", "nexus", "orbit", "palace", "portal", "prism",
-    "realm", "ridge", "sector", "sphere", "spire", "station", "summit", "temple",
-    "tower", "vault", "vector", "vertex", "void", "vortex", "zone"
+    "apex", "arrow", "atlas", "atom", "beacon", "bear", "blade", "castle", "cipher",
+    "circuit", "citadel", "code", "comet", "core", "cosmos", "crown", "delta",
+    "dragon", "eagle", "echo", "engine", "falcon", "flame", "fortress", "galaxy",
+    "ghost", "grid", "haven", "hawk", "horizon", "hunter", "island", "knight",
+    "lion", "lunar", "matrix", "mech", "moon", "nebula", "nexus", "ninja", "omega",
+    "orbit", "palace", "phoenix", "pixel", "portal", "prism", "pulse", "quest",
+    "raven", "realm", "rebel", "ridge", "rocket", "saber", "scout", "sector",
+    "shark", "signal", "spark", "sphere", "spire", "star", "station", "summit",
+    "surge", "temple", "tiger", "titan", "tower", "vault", "vector", "vertex",
+    "viper", "void", "volt", "vortex", "wave", "wolf", "zero", "zone"
 ]
 
 
-def generate_invite_code(redis_client: 'RedisClient' = None, max_retries: int = 10) -> str:
+def generate_invite_code(redis_client: 'RedisClient' = None, max_retries: int = 20) -> str:
     """
-    Generate a unique 3-word invite code.
-    Format: adjective-noun-object (e.g., "golden-dragon-castle")
+    Generate a unique 2-word invite code.
+    Format: adjective-noun (e.g., "golden-dragon")
 
     Args:
         redis_client: Optional RedisClient to check for collisions
@@ -52,11 +49,10 @@ def generate_invite_code(redis_client: 'RedisClient' = None, max_retries: int = 
         RuntimeError: If unable to generate unique code after max_retries
     """
     for attempt in range(max_retries):
-        # Generate random 3-word code
+        # Generate random 2-word code
         adjective = random.choice(ADJECTIVES)
         noun = random.choice(NOUNS)
-        obj = random.choice(OBJECTS)
-        code = f"{adjective}-{noun}-{obj}"
+        code = f"{adjective}-{noun}"
 
         # If no redis client provided, return immediately
         if redis_client is None:

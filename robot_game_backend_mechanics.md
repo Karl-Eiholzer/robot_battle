@@ -19,7 +19,7 @@ Describes game start after initialization and how the backend should combine the
 
 When a player creates a new game via `POST /game/create`, the backend:
 1. Creates a unique game_id
-2. Generates **two invite codes** using a 3-word memorable format (e.g., `golden-dragon-castle`)
+2. Generates **two invite codes** using a 2-word memorable format (e.g., `golden-dragon`)
    - **team_0_invite_code**: Share with your teammates
    - **team_1_invite_code**: Share with opponents
 3. Returns both codes to the creator
