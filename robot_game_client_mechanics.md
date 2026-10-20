@@ -316,7 +316,7 @@ While the game is in development, certain variables need to be changeable to tes
 
 The player who initiates a new game is provided a menu of options to select the variables. These variables include:
 * **Team Size** number of players on each team (2 or 3). Default 2
-* **Map Size** defined by the number of tiles high and number of tiles wide. Default "medium" (40 height 40 width"). Choice of "small" (20 height by 30 width) or "Large" (40 height 60 width).
+* **Map Size** defined by the number of tiles high and number of tiles wide. Default "medium" (27 height 27 width). Choice of "small" (20 height by 30 width) or "Large" (40 height 60 width).
 * **Input Time** amount of time each player has to enter their actions. Default to 120 seconds. Other options: 60 seconds, 90 seconds, 150 seconds.
 * **Review Time** amount of time each player has to view the replay at the end of the Turn. Default to 40 seconds. Other options: 20 seconds, 30 seconds, 50 seconds, 60 seconds.
 * **Energy Points** number of energy points each Robot starts with, between 0 and 3 (up to that Robot type's maximum), default to 2

@@ -625,7 +625,7 @@ def check_win_condition(game_id: str) -> Optional[int]:
 
 MAP_SIZES = {
     "small": (30, 20),
-    "medium": (40, 40),
+    "medium": (27, 27),  # 2/3 of the original 40x40 after play-testing
     "large": (60, 40)
 }
 

@@ -54,7 +54,7 @@ While the game is in development, certain variables need to be changeable to tes
 
 The JSON posted to the API from the Godot Client by the player who initiates a new game will include variables which affect game set-up. These variables include:
 * **Team Size** number of players on each team (2 or 3). Default 2
-* **Map Size** defined by the number of tiles high and number of tiles wide. Default "medium" (40 height 40 width"). Choice of "small" (20 height by 30 width) or "Large" (40 height 60 width).
+* **Map Size** defined by the number of tiles high and number of tiles wide. Default "medium" (27 height 27 width). Choice of "small" (20 height by 30 width) or "Large" (40 height 60 width).
 * **Input Time** amount of time each player has to enter their actions. Default 120 seconds.
 * **Review Time** amount of time each player has to view the replay at the end of the Turn
 * **Energy Points** number of energy points each Robot starts with, between 0 and 3 (up to that Robot type's maximum), default to 2
