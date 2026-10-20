@@ -398,6 +398,7 @@ def process_turn_with_robots(
     hex_objects_created_all: List[Dict] = []
     hex_objects_destroyed_all: List[Dict] = []
     winner = None
+    capture = None
     winning_team = None
 
     # Process 6 rounds
@@ -467,6 +468,8 @@ def process_turn_with_robots(
                 "animation_type": animation,
                 "before_position": before_pos,
                 "after_position": after_pos,
+                # Where the robot tried to go; differs from after_position on a Bump
+                "target_position": action.get("after_position", after_pos),
                 "status": status
             }
             replay_rounds[round_num].append(replay_frame)
@@ -475,6 +478,13 @@ def process_turn_with_robots(
             if status == "win":
                 winner = robot_id
                 winning_team = robot["team"]
+                captain = get_robot_at_position(robots, action["after_position"])
+                capture = {
+                    "round": round_num,
+                    "capturing_robot_id": robot_id,
+                    "captain_id": captain["robot_id"] if captain else None,
+                    "position": action["after_position"],
+                }
                 break
 
         # Apply created hex objects to the active list
@@ -495,7 +505,8 @@ def process_turn_with_robots(
         "rounds": replay_rounds,
         "hex_objects_created": hex_objects_created_all,
         "hex_objects_destroyed": hex_objects_destroyed_all,
-        "winner": winning_team
+        "winner": winning_team,
+        "capture": capture
     }
 
     # Store replay

@@ -31,6 +31,7 @@ extends Node2D
 # ==================== State ====================
 
 var _last_replay: Dictionary = {}
+var _winner: int = -1
 
 # Step context menu (right-click on a timeline cell or map step marker)
 enum MenuItem { WAIT, INSERT_WAIT, DELETE_STEP, DEPLOY, CLEAR_DEPLOY, CLEAR_ROBOT }
@@ -211,6 +212,9 @@ func _handle_key(event: InputEventKey) -> void:
 		timeline.toggle_collapsed()
 	elif key == KEY_R and not replay_btn.disabled:
 		_replay_last_turn()
+	elif TurnInput.current_phase == TurnInput.Phase.GAME_OVER and key in [KEY_ENTER, KEY_KP_ENTER]:
+		if not submit_btn.disabled:
+			_go_to_game_end(_winner)
 	elif TurnInput.current_phase == TurnInput.Phase.DEPLOY_TARGETING:
 		handled = _handle_deploy_key(event)
 	elif TurnInput.current_phase == TurnInput.Phase.INPUT and (not modified or key == KEY_Z):
@@ -352,6 +356,9 @@ func _on_cancel() -> void:
 
 func _update_header() -> void:
 	turn_label.text = "Turn %d" % (GameState.current_turn + 1)
+	if TurnInput.current_phase == TurnInput.Phase.GAME_OVER:
+		# Turn results already advanced current_turn past the final turn
+		turn_label.text = "Turn %d (final)" % GameState.current_turn
 	initiative_label.text = "Initiative: Team %d" % GameState.initiative_team
 	var phase_name = TurnInput.Phase.keys()[TurnInput.current_phase]
 	phase_label.text = "Phase: " + phase_name
@@ -663,6 +670,9 @@ func _on_step_menu_id_pressed(id: int) -> void:
 # ==================== Submit ====================
 
 func _on_submit_pressed() -> void:
+	if TurnInput.current_phase == TurnInput.Phase.GAME_OVER:
+		_go_to_game_end(_winner)
+		return
 	if TurnInput.current_phase != TurnInput.Phase.INPUT:
 		return
 
@@ -736,24 +746,16 @@ func _on_request_failed(endpoint: String, _status_code: int, body: String) -> vo
 # ==================== Replay Playback ====================
 
 func _play_replay(replay: Dictionary, full_results: Dictionary) -> void:
-	_show_overlay("Playing turn replay...")
 	TurnInput.set_phase(TurnInput.Phase.REVIEWING)
-
-	var rounds = replay.get("rounds", [])
-	var hex_objects_created = replay.get("hex_objects_created", [])
-	var hex_objects_destroyed = replay.get("hex_objects_destroyed", [])
 	var winner = replay.get("winner", null)
+	if winner != null:
+		# The overlay would sit right on top of the capture, so narrate in the hint instead
+		hint_label.text = "Final turn: watch the Captain..."
+		_focus_on_capture(replay)
+	else:
+		_show_overlay("Playing turn replay...")
 
-	for round_idx in range(rounds.size()):
-		var created_this_round: Array = []
-		var destroyed_this_round: Array = []
-		if round_idx == rounds.size() - 1:
-			created_this_round = hex_objects_created
-			destroyed_this_round = hex_objects_destroyed
-
-		hex_map.animate_replay_round(rounds[round_idx], created_this_round, destroyed_this_round)
-		await get_tree().create_timer(0.6).timeout
-
+	await _animate_replay(replay)
 	await get_tree().create_timer(0.5).timeout
 
 	_last_replay = replay
@@ -761,10 +763,44 @@ func _play_replay(replay: Dictionary, full_results: Dictionary) -> void:
 	_hide_overlay()
 
 	if winner != null:
-		_go_to_game_end(winner)
+		_show_game_over(winner)
 	else:
 		replay_btn.disabled = false
 		_start_next_turn()
+
+# Animate a turn's rounds, stopping at the capture round if the game ended.
+func _animate_replay(replay: Dictionary) -> void:
+	var rounds = replay.get("rounds", [])
+	var hex_objects_created = replay.get("hex_objects_created", [])
+	var hex_objects_destroyed = replay.get("hex_objects_destroyed", [])
+	var capture = replay.get("capture", null)
+	var last_round = rounds.size() - 1
+	if capture is Dictionary:
+		last_round = mini(int(capture.get("round", last_round)), last_round)
+
+	for round_idx in range(last_round + 1):
+		var created_this_round: Array = []
+		var destroyed_this_round: Array = []
+		if round_idx == last_round:
+			created_this_round = hex_objects_created
+			destroyed_this_round = hex_objects_destroyed
+		hex_map.animate_replay_round(rounds[round_idx], created_this_round, destroyed_this_round)
+		await get_tree().create_timer(0.6).timeout
+
+	if capture is Dictionary:
+		var pos = capture.get("position", [0, 0])
+		hex_map.show_capture(Vector2i(int(pos[0]), int(pos[1])))
+		await get_tree().create_timer(1.0).timeout
+
+# Center the camera on the captured Captain so the final replay plays out in view.
+func _focus_on_capture(replay: Dictionary) -> void:
+	var capture = replay.get("capture", null)
+	if not capture is Dictionary:
+		return
+	var pos = capture.get("position", [0, 0])
+	if camera.zoom.x < 1.0:
+		camera.zoom = Vector2.ONE
+	_center_camera_on(HexMath.axial_to_pixel(Vector2i(int(pos[0]), int(pos[1])), HexMath.HEX_SIZE))
 
 func _replay_last_turn() -> void:
 	if _last_replay.is_empty():
@@ -774,22 +810,22 @@ func _replay_last_turn() -> void:
 	submit_btn.disabled = true
 	var saved_robot_id = TurnInput.selected_robot_id
 
-	_show_overlay("Replaying turn...")
+	var game_over = TurnInput.current_phase == TurnInput.Phase.GAME_OVER
+	if game_over:
+		_focus_on_capture(_last_replay)
+	else:
+		_show_overlay("Replaying turn...")
 	hex_map.reset_for_replay(_last_replay)
 
-	var rounds = _last_replay.get("rounds", [])
-	var hex_objects_created = _last_replay.get("hex_objects_created", [])
-	var hex_objects_destroyed = _last_replay.get("hex_objects_destroyed", [])
-	for round_idx in range(rounds.size()):
-		var created_this_round: Array = []
-		var destroyed_this_round: Array = []
-		if round_idx == rounds.size() - 1:
-			created_this_round = hex_objects_created
-			destroyed_this_round = hex_objects_destroyed
-		hex_map.animate_replay_round(rounds[round_idx], created_this_round, destroyed_this_round)
-		await get_tree().create_timer(0.6).timeout
-
+	await _animate_replay(_last_replay)
 	await get_tree().create_timer(0.5).timeout
+
+	if game_over:
+		# Leave the final position on screen, with the capture marked
+		_hide_overlay()
+		replay_btn.disabled = false
+		submit_btn.disabled = false
+		return
 
 	# Restore planning view
 	hex_map.populate_from_game_state()
@@ -818,6 +854,17 @@ func _start_next_turn() -> void:
 		input_timer.wait_time = float(input_time)
 		input_timer.start()
 
+# Stay on the map after the final replay so players can see (and re-watch) the
+# capture; Submit becomes End Game.
+func _show_game_over(winner: int) -> void:
+	_winner = winner
+	TurnInput.set_phase(TurnInput.Phase.GAME_OVER)
+	input_timer.stop()
+	timer_label.text = ""
+	var outcome = "You win!" if winner == GameState.player_team else "You lose."
+	hint_label.text = "Team %d captured the Captain. %s Press Replay Last Turn [R] to watch again, or End Game [Enter] for the results." % [
+		winner, outcome]
+
 func _go_to_game_end(winner: int) -> void:
 	GameState.game_state_str = "complete"
 	GameState.initiative_team = winner
@@ -837,6 +884,11 @@ func _on_phase_changed(new_phase: TurnInput.Phase) -> void:
 			submit_btn.disabled = true
 		TurnInput.Phase.SUBMITTING:
 			submit_btn.disabled = true
+		TurnInput.Phase.GAME_OVER:
+			submit_btn.text = "End Game  [Enter]"
+			submit_btn.disabled = false
+			deploy_btn.disabled = true
+			replay_btn.disabled = false
 		TurnInput.Phase.REVIEWING:
 			submit_btn.disabled = true
 			hex_map.clear_adjacent_highlights()
