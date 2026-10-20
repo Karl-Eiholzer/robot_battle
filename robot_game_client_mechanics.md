@@ -304,7 +304,8 @@ Action required by player when using the "deploy" action
 2. Calculate coordinates of target hex as well as the hexes in the line between the Robot hex and the target hex and add them to a list of firewall hexes
 3. Show location of 4 Firewall hexes to the user using Firewall tokens
 4. List of firewall hexes sent to backend processing API as part of "turn" submission
-5. Effects handled by backend processing
+5. Effects handled by backend processing: a robot that steps onto (or lands a leap on) or waits on a firewall hex is sent home stunned and that piece is removed. Pieces are permanent until triggered, hit both teams, and become active the round after they are placed
+6. Planning: auto-routing avoids known firewall hexes, and the robot card warns about any planned step that ends on one
 
 ### **Supply Drop**
 1. Select a target hex adjacent to the Robot (based on where the Robot is at the beginning of the "round")

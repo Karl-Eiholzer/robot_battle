@@ -433,6 +433,9 @@ func _update_robot_card() -> void:
 	var issues = TurnInput.get_step_issues(robot_id)
 	for round_num in issues.keys():
 		lines.append("! R%d: %s" % [round_num + 1, issues[round_num]])
+	var warnings = TurnInput.get_firewall_warnings(robot_id)
+	for round_num in warnings.keys():
+		lines.append("! R%d: %s" % [round_num + 1, warnings[round_num]])
 	robot_card.text = "\n".join(lines)
 
 # ==================== Robot Selection ====================

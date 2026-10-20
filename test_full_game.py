@@ -671,6 +671,22 @@ class FullGameTester:
                 "deploy": {"type": "leap", "target_hexes": [leap_target]}
             }]
 
+            # Defender lays a firewall east in round 1, then steps onto its own first
+            # piece in round 3 (pieces are live from the round after they're placed)
+            defender = next((r for r in robots if r["team"] == 0 and r["type"] == "defender"), None)
+            d_pos = defender["position"]
+            fw_hexes = [[d_pos[0] + i, d_pos[1]] for i in range(1, 5)]
+            first_piece = fw_hexes[0]
+            firewall_actions = [
+                {"robot_id": defender["robot_id"], "round_number": 0, "action_type": "wait",
+                 "before_position": d_pos, "after_position": d_pos,
+                 "deploy": {"type": "firewall", "target_hexes": fw_hexes}},
+                {"robot_id": defender["robot_id"], "round_number": 1, "action_type": "wait",
+                 "before_position": d_pos, "after_position": d_pos, "deploy": None},
+                {"robot_id": defender["robot_id"], "round_number": 2, "action_type": "move",
+                 "before_position": d_pos, "after_position": first_piece, "deploy": None},
+            ]
+
             # Submit for all players
             for p in players:
                 actions = []
@@ -678,6 +694,8 @@ class FullGameTester:
                     actions += emp_actions
                 if p["id"] == scout["player_id"]:
                     actions += leap_actions
+                if p["id"] == defender["player_id"]:
+                    actions += firewall_actions
                 self.submit_moves(game_id, 0, actions, p["key"])
 
             results = self.poll_results(game_id, 0, creator_key)
@@ -700,6 +718,19 @@ class FullGameTester:
                 else:
                     self.log_error(f"Scout leap failed: expected {leap_target} with energy "
                                    f"{scout['energy'] - 1}, got {leaped}")
+
+                self.log_test("Test stepping onto a firewall")
+                defender_key = next(p["key"] for p in players if p["id"] == defender["player_id"])
+                defender_view = self.poll_results(game_id, 0, defender_key) or {}
+                burned = next((r for r in defender_view.get("updated_robots", [])
+                               if r["robot_id"] == defender["robot_id"]), None)
+                pieces = [o["position"] for o in (defender_view.get("updated_hex_objects") or [])
+                          if o.get("type") == "firewall"]
+                if burned and burned["position"] == defender["spawn_position"] \
+                        and first_piece not in pieces and len(pieces) == 3:
+                    self.log_success("Stepping onto a firewall sent the Defender home and burned that one piece")
+                else:
+                    self.log_error(f"Firewall step failed: defender {burned}, firewall pieces left {pieces}")
             else:
                 self.log_error("Failed to get results after EMP deploy")
         else:
