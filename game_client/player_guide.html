@@ -165,13 +165,14 @@
 
 		<ul>
 			<li><strong>Any robot can make the capture.</strong> Strength does not matter here. Even an Engineer, the weakest robot, wins the game if it steps onto the enemy Captain.</li>
-			<li><strong>The capture has to be a move.</strong> Your robot must step into the Captain's hex during a round. Standing next to it is not enough.</li>
+			<li><strong>The capture has to be a move.</strong> Your robot must step into the Captain's hex during a round, or, for a Scout, leap into it. Standing next to it is not enough.</li>
+			<li><strong>Watch for enemy Scouts.</strong> A Scout can leap onto your Captain from up to 3 hexes away, straight over water, forest and other robots.</li>
 			<li><strong>The game ends the moment it happens.</strong> Nothing else in that turn is played out.</li>
 		</ul>
 
 		<h3>How a turn works</h3>
 		<ol>
-			<li><strong>Plan.</strong> Everyone plans at the same time. You draw a path for each of your robots on the map. A turn has <strong>6 rounds</strong>, and in each round a robot either <strong>moves</strong> one hex or <strong>waits</strong>. You cannot see what anyone else is planning.</li>
+			<li><strong>Plan.</strong> Everyone plans at the same time. You draw a path for each of your robots on the map. A turn has <strong>6 rounds</strong>, and in each round a robot either <strong>moves</strong> one hex or <strong>waits</strong>. Once per turn, a Scout can instead <strong>leap</strong> 2 or 3 hexes. You cannot see what anyone else is planning.</li>
 			<li><strong>Submit.</strong> Press <em>Submit Turn</em> (or Enter) before the timer runs out. If time runs out, your plan is sent as it stands. Any round you left empty becomes a wait.</li>
 			<li><strong>Watch the replay.</strong> When every player has submitted, the server plays all the moves together and everyone watches the same replay.</li>
 		</ol>
@@ -197,8 +198,8 @@
 
 		<h3>Rules every robot follows</h3>
 		<ul>
-			<li><strong>Movement.</strong> A move goes to one of the six neighbouring hexes. Each robot has a limited number of moves per turn, and the rounds it does not move in are waits. You can mix moves and waits in any order.</li>
-			<li><strong>Blocked hexes.</strong> Robots cannot enter walls or other blocked terrain, and they cannot move onto a teammate.</li>
+			<li><strong>Movement.</strong> A move goes to one of the six neighbouring hexes. The one exception is a Scout's leap, which covers 2 or 3 hexes in a single move. Each robot has a limited number of moves per turn, and the rounds it does not move in are waits. You can mix moves and waits in any order.</li>
+			<li><strong>Blocked hexes.</strong> Robots cannot enter water or forest, and they cannot move onto a teammate. A leaping Scout can pass over water and forest, but it can't land on them.</li>
 			<li><strong>Strength.</strong> When a robot tries to move onto an enemy, the stronger one wins. See <a href="#knockouts">section 3</a>.</li>
 			<li><strong>Energy and abilities.</strong> Using a special ability (pressing <em>Deploy</em>) costs <strong>1 energy</strong>. A robot with no energy cannot use its ability. Each robot type has a maximum energy it can hold.</li>
 			<li><strong>Sight.</strong> Each robot sees enemies within its sight range.</li>
@@ -288,7 +289,7 @@
 				<div class="stat"><b>3</b><span>Max energy</span></div>
 				<div class="stat"><b>3</b><span>Sight</span></div>
 			</div>
-			<p><strong>Movement:</strong> only 2 moves per turn, and it has the <strong>shortest sight range</strong>. What it has is strength. A Defender beats Scouts and Engineers, so a Defender standing next to your Captain is a wall that enemy Scouts cannot get through.</p>
+			<p><strong>Movement:</strong> only 2 moves per turn, and it has the <strong>shortest sight range</strong>. What it has is strength. A Defender beats Scouts and Engineers, so a Defender next to your Captain stops enemy Scouts from stepping in. Enemy Scouts can leap over a Defender, though, so a single Defender can't seal off your Captain. Cover the hexes 2 or 3 away as well.</p>
 			<div class="ability">
 				<h4>Special ability: Firewall</h4>
 				<p>Lays a firewall in a <strong>straight line of 4 hexes</strong> running out from the Defender.</p>
@@ -363,7 +364,7 @@
 			<div class="ko-card">
 				<h3>1. Pushed by a stronger enemy</h3>
 				<p><span class="tag home">Sent home + stunned</span></p>
-				<p>If an enemy with <strong>higher strength</strong> moves onto your robot's hex, your robot is shoved all the way back to its <strong>starting hex</strong> and stunned. The attacker takes the hex.</p>
+				<p>If an enemy with <strong>higher strength</strong> moves onto your robot's hex, your robot is shoved all the way back to its <strong>starting hex</strong> and stunned. The attacker takes the hex. Leaping onto a robot counts too, so an enemy Scout can knock home an Engineer from 3 hexes away.</p>
 				<p class="muted">Strength order: Captain 7 &gt; Defender 5 &gt; Scout 3 &gt; Engineer 0.</p>
 			</div>
 			<div class="ko-card">
