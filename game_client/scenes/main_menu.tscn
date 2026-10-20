@@ -132,11 +132,22 @@ theme_override_colors/font_color = Color(0.4, 0.9, 0.4, 1)
 theme_override_font_sizes/font_size = 14
 horizontal_alignment = 1
 
-[node name="CopyTeam0Btn" type="Button" parent="CenterContainer/VBox"]
+[node name="Team0CopyRow" type="HBoxContainer" parent="CenterContainer/VBox"]
 visible = false
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CopyTeam0CodeBtn" type="Button" parent="CenterContainer/VBox/Team0CopyRow"]
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
-text = "Copy Team 0 Code"
+size_flags_horizontal = 3
+text = "Copy Code"
+
+[node name="CopyTeam0LinkBtn" type="Button" parent="CenterContainer/VBox/Team0CopyRow"]
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Copy Link"
 
 [node name="Team1CodeLabel" type="Label" parent="CenterContainer/VBox"]
 visible = false
@@ -150,11 +161,22 @@ theme_override_colors/font_color = Color(0.9, 0.4, 0.4, 1)
 theme_override_font_sizes/font_size = 14
 horizontal_alignment = 1
 
-[node name="CopyTeam1Btn" type="Button" parent="CenterContainer/VBox"]
+[node name="Team1CopyRow" type="HBoxContainer" parent="CenterContainer/VBox"]
 visible = false
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CopyTeam1CodeBtn" type="Button" parent="CenterContainer/VBox/Team1CopyRow"]
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
-text = "Copy Team 1 Code"
+size_flags_horizontal = 3
+text = "Copy Code"
+
+[node name="CopyTeam1LinkBtn" type="Button" parent="CenterContainer/VBox/Team1CopyRow"]
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Copy Link"
 
 [node name="PollTimer" type="Timer" parent="."]
 wait_time = 5.0

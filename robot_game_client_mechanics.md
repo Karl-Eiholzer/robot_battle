@@ -175,7 +175,7 @@ The creator controls who plays on which team by deciding who gets which code:
 4. Receives two invite codes displayed on screen:
    - **Team 0 Code** (green) - for their teammates
    - **Team 1 Code** (red) - for opponents
-5. Can copy each code separately to share via chat/voice
+5. Each code has **Copy Code** and **Copy Link** buttons; the link opens the web client with the code filled in
 
 **Joining a Game:**
 1. Player enters their name in the main menu
