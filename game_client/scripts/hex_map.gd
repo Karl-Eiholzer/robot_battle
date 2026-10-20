@@ -55,6 +55,9 @@ var _hover_valid: bool = true
 # Keyboard-chosen deploy target, outlined in white (when _has_focus_hex).
 var _focus_hex: Vector2i = Vector2i.ZERO
 var _has_focus_hex: bool = false
+# Hex where a Captain was captured (end of game), drawn as a red ring.
+var _capture_hex: Vector2i = Vector2i.ZERO
+var _has_capture_hex: bool = false
 
 # Mouse tracking for hover/drag/right-click detection
 var _last_hover_hex: Vector2i = Vector2i(-9999, -9999)
@@ -165,6 +168,7 @@ func get_robot_sprite(robot_id: String) -> Node2D:
 
 # Reset map visuals to the state at the start of a turn for replay rewatching.
 func reset_for_replay(replay_data: Dictionary) -> void:
+	clear_capture()
 	var rounds = replay_data.get("rounds", [])
 	if not rounds.is_empty():
 		for robot_replay in rounds[0]:
@@ -318,6 +322,15 @@ func _obj_label(type: String) -> String:
 
 # ==================== Highlights ====================
 
+func show_capture(hex: Vector2i) -> void:
+	_capture_hex = hex
+	_has_capture_hex = true
+	queue_redraw()
+
+func clear_capture() -> void:
+	_has_capture_hex = false
+	queue_redraw()
+
 # Deploy targeting highlights (purple).
 func highlight_hexes(hexes: Array, color: Color) -> void:
 	_highlight_hexes.clear()
@@ -422,6 +435,16 @@ func _draw_plan_paths() -> void:
 			draw_circle(center, HEX_SIZE * 0.3, Color(0.8, 0.4, 1.0, 0.6 * alpha))
 			draw_string(font, center + Vector2(-HEX_SIZE * 0.5, 5), deploy["label"],
 				HORIZONTAL_ALIGNMENT_CENTER, HEX_SIZE, 13, Color(1, 1, 1, alpha))
+
+	if _has_capture_hex:
+		var cc = HexMath.axial_to_pixel(_capture_hex, HEX_SIZE)
+		var red = Color(1.0, 0.2, 0.2)
+		draw_polyline(_close_polygon(_hex_corners(cc)), red, 5.0)
+		draw_arc(cc, HEX_SIZE * 1.6, 0, TAU, 48, red, 3.0)
+		var cap_font = ThemeDB.fallback_font
+		var text_pos = cc + Vector2(-HEX_SIZE * 2.0, -HEX_SIZE * 1.9)
+		draw_rect(Rect2(text_pos + Vector2(0, -18), Vector2(HEX_SIZE * 4.0, 24)), Color(0, 0, 0, 0.7))
+		draw_string(cap_font, text_pos, "CAPTURED!", HORIZONTAL_ALIGNMENT_CENTER, HEX_SIZE * 4.0, 18, red)
 
 	if _has_focus_hex:
 		var fc = HexMath.axial_to_pixel(_focus_hex, HEX_SIZE)
@@ -543,8 +566,14 @@ func animate_replay_round(round_replays: Array, hex_objects_created: Array,
 			"Move", "PowerMove":
 				sprite.animate_move(from_pixel, to_pixel, 0.4)
 			"Bump":
-				var dir_pixel = to_pixel - from_pixel
-				sprite.animate_bump(dir_pixel.normalized(), 0.2)
+				# A bump never changes position, so aim it at the hex the robot tried to enter
+				var target = robot_replay.get("target_position", after_pos)
+				var target_pixel = HexMath.axial_to_pixel(Vector2i(int(target[0]), int(target[1])), HEX_SIZE)
+				if robot_replay.get("status", "") == "win":
+					# The capture: lunge most of the way onto the Captain's hex
+					sprite.animate_move(from_pixel, from_pixel.lerp(target_pixel, 0.7), 0.4)
+				else:
+					sprite.animate_bump((target_pixel - from_pixel).normalized(), 0.2)
 			"Stunned":
 				sprite.show_stunned_flash()
 			"Waiting", "Puzzled":

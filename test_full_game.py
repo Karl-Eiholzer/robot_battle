@@ -447,6 +447,11 @@ class FullGameTester:
             winner = results.get("winner")
             if winner is not None:
                 self.log_success(f"Win condition detected: Team {winner} wins!")
+                capture = (results.get("replay") or {}).get("capture")
+                if capture and capture.get("position") and capture.get("captain_id"):
+                    self.log_success(f"Replay marks the captured Captain at {capture['position']}")
+                else:
+                    self.log_error(f"Win replay is missing capture info: {capture}")
             else:
                 self.log_info("No win this turn (scout may not have reached captain - expected in test)")
         else:

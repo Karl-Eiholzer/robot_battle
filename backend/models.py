@@ -136,6 +136,7 @@ class RobotRoundReplay(BaseModel):
     animation_type: str  # Stunned, Waiting, Move, Bump, PowerMove, Puzzled
     before_position: List[int]
     after_position: List[int]
+    target_position: Optional[List[int]] = None  # hex the robot tried to enter
     status: str  # success, fail, error, stunned, win
 
 
@@ -146,6 +147,8 @@ class TurnReplay(BaseModel):
     hex_objects_created: List[HexObject] = Field(default_factory=list)
     hex_objects_destroyed: List[HexObject] = Field(default_factory=list)
     winner: Optional[int] = None  # winning team (0 or 1), None if no winner
+    # On a win: {round, capturing_robot_id, captain_id, position} of the captured Captain
+    capture: Optional[Dict[str, Any]] = None
 
 
 # ==================== Request Models ====================
