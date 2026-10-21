@@ -4,10 +4,12 @@ extends Control
 # Each player assigns their own role via a dropdown.
 # The backend validates the complete set when spawn_robots is called.
 
+const ROLES_1: Array = ["commander"]
 const ROLES_2: Array = ["captain", "huntsman"]
 const ROLES_3: Array = ["captain", "huntsman", "engineer"]
 
 const ROLE_DESCRIPTIONS: Dictionary = {
+	"commander": "Commander: 1 Captain + 2 Defenders + 4 Scouts + 3 Engineers",
 	"captain":  "Captain: 1 Captain + 2 Defenders + 2 Engineers",
 	"huntsman": "Huntsman: 4 Scouts + 1 Engineer",
 	"engineer": "Engineer: 5 Engineers",
@@ -60,7 +62,7 @@ func _build_role_ui() -> void:
 	for child in roles_container.get_children():
 		child.queue_free()
 
-	var available_roles = ROLES_3 if _team_size == 3 else ROLES_2
+	var available_roles = _available_roles()
 
 	var hbox = HBoxContainer.new()
 	hbox.add_theme_constant_override("separation", 12)
@@ -80,10 +82,16 @@ func _build_role_ui() -> void:
 
 func _update_role_guide() -> void:
 	var lines: Array = []
-	var roles = ROLES_3 if _team_size == 3 else ROLES_2
+	var roles = _available_roles()
 	for role in roles:
 		lines.append(ROLE_DESCRIPTIONS.get(role, role))
 	role_guide.text = "\n".join(lines)
+
+func _available_roles() -> Array:
+	match _team_size:
+		1: return ROLES_1
+		3: return ROLES_3
+		_: return ROLES_2
 
 # ==================== Button Handlers ====================
 
@@ -92,7 +100,7 @@ func _on_assign_pressed() -> void:
 		_show_error("No role selected.")
 		return
 
-	var available_roles = ROLES_3 if _team_size == 3 else ROLES_2
+	var available_roles = _available_roles()
 	var chosen_role = available_roles[_my_role_dropdown.selected]
 	var assignments = {GameState.player_id: chosen_role}
 

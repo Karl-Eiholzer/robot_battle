@@ -37,8 +37,10 @@ var _copy_done_msg: String = ""
 func _ready() -> void:
 	# Populate team size dropdown
 	team_size_option.clear()
+	team_size_option.add_item("1v1 (1 per team)", 1)
 	team_size_option.add_item("2v2 (2 per team)", 2)
 	team_size_option.add_item("3v3 (3 per team)", 3)
+	team_size_option.select(team_size_option.get_item_index(2))
 
 	# Pre-fill from saved state if available
 	if GameState.player_name != "":
@@ -123,14 +125,19 @@ func _on_game_created(data: Dictionary) -> void:
 	team_0_code_display.text = team_0_code
 	team_1_code_display.text = team_1_code
 
-	team_0_code_label.visible = true
-	team_0_code_display.visible = true
-	team_0_copy_row.visible = true
+	# In 1v1 the creator already fills Team 0, so only the opponent code is useful
+	var solo = team_size_option.get_item_id(team_size_option.selected) == 1
+	team_0_code_label.visible = not solo
+	team_0_code_display.visible = not solo
+	team_0_copy_row.visible = not solo
 	team_1_code_label.visible = true
 	team_1_code_display.visible = true
 	team_1_copy_row.visible = true
 
-	_show_status("Game created! Share codes with players:")
+	if solo:
+		_show_status("Game created! Share this code with your opponent:")
+	else:
+		_show_status("Game created! Share codes with players:")
 	_set_waiting(true, "Waiting for players to join...")
 	poll_timer.start()
 

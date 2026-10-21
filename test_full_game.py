@@ -449,6 +449,99 @@ class FullGameTester:
 
         return True
 
+    # ==================== Test: 1v1 Game Flow ====================
+
+    def test_1v1_game_flow(self):
+        self.log_section("1v1 Game Flow Test")
+
+        self.log_test("Create 1v1 game")
+        game = self.create_game(max_players=2, team_size=1, map_size="small")
+        if not game:
+            self.log_error("Failed to create game")
+            return False
+
+        game_id = game["game_id"]
+        creator_key = game["api_key"]
+        creator_id = game["creator_player_id"]
+        team_1_code = game["team_1_invite_code"]
+        self.log_success(f"1v1 game created: {game_id}")
+
+        opponent = self.join_game_by_code(team_1_code, "Opponent")
+        if not opponent:
+            self.log_error("Opponent failed to join")
+            return False
+        if opponent["state"] == "in_progress":
+            self.log_success("Opponent joined; game is full and in progress")
+        else:
+            self.log_error(f"Expected in_progress after 2 players, got {opponent['state']}")
+
+        self.log_test("Second opponent rejected (team full)")
+        if self.join_game_by_code(team_1_code, "Extra") is None:
+            self.log_success("Extra player correctly rejected")
+        else:
+            self.log_error("Extra player should not be able to join a full 1v1 team")
+
+        self.log_test("Non-commander role rejected in 1v1")
+        result = self.assign_roles(game_id, 0, {creator_id: "captain"}, creator_key)
+        if result and result.get("status_code") == 400:
+            self.log_success("Captain role correctly rejected for team size 1")
+        else:
+            self.log_error(f"Expected 400 for captain role in 1v1, got {result}")
+
+        result = self.assign_roles(game_id, 0, {creator_id: "commander"}, creator_key)
+        if not result or result.get("error"):
+            self.log_error(f"Team 0 commander assignment failed: {result}")
+            return False
+        result = self.assign_roles(game_id, 1, {opponent["player_id"]: "commander"},
+                                   opponent["api_key"])
+        if not result or result.get("error"):
+            self.log_error(f"Team 1 commander assignment failed: {result}")
+            return False
+        self.log_success("Both players assigned commander")
+
+        spawn_result = self.spawn_robots(game_id, creator_key)
+        if not spawn_result or spawn_result.get("error"):
+            self.log_error(f"1v1 spawn failed: {spawn_result}")
+            return False
+
+        # Commander: 1 captain + 4 scouts + 2 defenders + 3 engineers = 10 per team
+        robot_count = spawn_result["robots_created"]
+        if robot_count == 20:
+            self.log_success(f"Correct 1v1 robot count: {robot_count} (10 per team)")
+        else:
+            self.log_error(f"Expected 20 robots for 1v1, got {robot_count}")
+
+        state = self.get_initial_state(game_id, creator_key)
+        if state and len(state["player_robots"]) == 10:
+            self.log_success("Creator controls 10 robots")
+        else:
+            self.log_error(f"Expected 10 own robots, got {state and len(state['player_robots'])}")
+
+        for key in (creator_key, opponent["api_key"]):
+            result = self.submit_moves(game_id, 0, [], key)
+            if result and result.get("error"):
+                self.log_error(f"Submit failed: {result}")
+                return False
+
+        if self.poll_results(game_id, 0, creator_key, timeout=20):
+            self.log_success("1v1 turn 1 results received")
+        else:
+            self.log_error("Failed to get 1v1 results")
+            return False
+
+        self.log_test("Unsupported team size rejected")
+        resp = self.post("/game/create", {
+            "max_players": 8,
+            "map_config": {"width": 10, "height": 10},
+            "game_variables": {"team_size": 4}
+        })
+        if resp is not None and resp.status_code == 400:
+            self.log_success("team_size=4 correctly rejected")
+        else:
+            self.log_error(f"Expected 400 for team_size=4, got {resp.status_code if resp is not None else None}")
+
+        return True
+
     # ==================== Test: 3v3 Game Flow ====================
 
     def test_3v3_game_flow(self):
@@ -904,6 +997,7 @@ class FullGameTester:
         # Run test suites
         results = []
         results.append(("2v2 Game Flow", self.test_2v2_game_flow()))
+        results.append(("1v1 Game Flow", self.test_1v1_game_flow()))
         results.append(("3v3 Game Flow", self.test_3v3_game_flow()))
         results.append(("Captain Capture Win", self.test_captain_capture_win()))
         results.append(("Deploy Actions", self.test_deploy_actions()))

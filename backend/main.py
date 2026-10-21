@@ -15,7 +15,8 @@ from models import (
     AssignRolesRequest, AssignRolesResponse,
     SpawnRobotsResponse,
     InitialStateResponse,
-    GameVariables
+    GameVariables,
+    PLAYER_ROLES
 )
 from redis_client import redis_client
 from auth import get_current_player, generate_api_key, generate_player_id, store_player_key
@@ -68,6 +69,16 @@ async def create_game(request: CreateGameRequest):
     - Initializes game metadata in Redis
     - Returns API key for authentication
     """
+    # Use game variables from request or defaults
+    game_vars = request.game_variables or GameVariables()
+    game_vars_dict = game_vars.model_dump()
+
+    if game_vars.team_size not in PLAYER_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"team_size must be one of {sorted(PLAYER_ROLES)}"
+        )
+
     # Generate IDs
     game_id = f"game_{uuid.uuid4().hex[:12]}"
     creator_id = generate_player_id()
@@ -75,10 +86,6 @@ async def create_game(request: CreateGameRequest):
 
     # Store API key for creator
     store_player_key(creator_id, api_key)
-
-    # Use game variables from request or defaults
-    game_vars = request.game_variables or GameVariables()
-    game_vars_dict = game_vars.model_dump()
 
     # Generate game map based on game variables
     map_data = generate_default_map(

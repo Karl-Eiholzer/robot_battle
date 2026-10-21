@@ -102,7 +102,7 @@ Sent at game creation; stored in `game:{game_id}:variables`.
 
 ```json
 {
-  "team_size": 2,           // players per team: 2 or 3
+  "team_size": 2,           // players per team: 1, 2 or 3
   "map_size": "medium",     // "small", "medium", "large"
   "input_time": 90,         // seconds for action input phase
   "review_time": 40,        // seconds to review replay
@@ -124,6 +124,12 @@ Win condition: a team wins when the opposing team's Captain robot is captured.
 ### Player Roles
 
 Roles determine which robot types a player controls.
+
+**1-player teams (team_size=1, i.e. 1v1): commander**
+
+| role | robots |
+|------|--------|
+| commander | 1 captain + 2 defenders + 4 scouts + 3 engineers |
 
 **2-player teams (team_size=2): captain or huntsman**
 
@@ -357,7 +363,7 @@ Requires authentication. Assigns roles to players on a team. Can be called with 
 }
 ```
 
-`role_assignments` is a dict of `player_id → role_name`. For `team_size=2` the valid roles are `captain` and `huntsman`. For `team_size=3` the valid roles are `captain`, `huntsman`, and `engineer`.
+`role_assignments` is a dict of `player_id → role_name`. For `team_size=1` the only valid role is `commander`. For `team_size=2` the valid roles are `captain` and `huntsman`. For `team_size=3` the valid roles are `captain`, `huntsman`, and `engineer`.
 
 **Response:**
 ```json

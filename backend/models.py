@@ -54,7 +54,7 @@ ROBOT_TYPE_STATS: Dict[str, RobotTypeStats] = {
 
 class GameVariables(BaseModel):
     """Game configuration variables set at game creation"""
-    team_size: int = Field(default=2, description="Players per team (2 or 3)")
+    team_size: int = Field(default=2, description="Players per team (1, 2 or 3)")
     map_size: str = Field(default="medium", description="Map size: small, medium, large")
     input_time: int = Field(default=120, description="Seconds for action input")
     review_time: int = Field(default=40, description="Seconds to review replay")
@@ -73,6 +73,10 @@ class PlayerRole(BaseModel):
 
 # Role definitions: team_size -> role_name -> PlayerRole
 PLAYER_ROLES: Dict[int, Dict[str, PlayerRole]] = {
+    1: {
+        # 1v1: one player commands the whole 2v2 army (Captain + Huntsman merged)
+        "commander": PlayerRole(captain_count=1, scout_count=4, defender_count=2, engineer_count=3),
+    },
     2: {
         "captain": PlayerRole(captain_count=1, scout_count=0, defender_count=2, engineer_count=2),
         "huntsman": PlayerRole(captain_count=0, scout_count=4, defender_count=0, engineer_count=1),
