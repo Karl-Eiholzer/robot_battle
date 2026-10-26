@@ -16,7 +16,7 @@ Players are trying to keep their Captain from being captured while simultaneousl
 
 1. **Game Creation:** One player initiates the game and receives **two invite codes** (one for each team). This player sets game variables. See **Game Variables** below
 2. **Team Formation:** The creator shares the **Team 0 code** with intended teammates and the **Team 1 code** with opponents. Players join by entering their invite code, which automatically assigns them to the correct team.
-3. **Role Assignment:** Once all players have joined (4 for 2v2, or 6 for 3v3), each team assigns player roles. See **Player Roles** below.
+3. **Role Assignment:** Once all players have joined (2 for 1v1, 4 for 2v2, or 6 for 3v3), each team assigns player roles. See **Player Roles** below.
 4. **Robot Spawning:** After both teams have assigned roles, robots are spawned and players download the initial map state.
 5. **Gameplay:** Game proceeds in a series of "turns" where all players enter their moves for that "turn" simultaneously and all players get the results back at the same time. Each turn consists of 6 rounds - see **Player options within a turn** below
 6. **Win Condition:** Turns continue until the win condition is met for one team. When the win condition is met, backend processing stops and a final replay and score are sent to the players. See **Single turn steps** below
@@ -170,11 +170,12 @@ The creator controls who plays on which team by deciding who gets which code:
 
 **Creating a Game:**
 1. Player enters their name in the main menu
-2. Selects team size (2v2 or 3v3) and other game variables
+2. Selects team size (1v1, 2v2 or 3v3) and other game variables
 3. Clicks "Create New Game"
 4. Receives two invite codes displayed on screen:
    - **Team 0 Code** (green) - for their teammates
    - **Team 1 Code** (red) - for opponents
+   - In 1v1 only the Team 1 code is shown, since the creator fills Team 0
 5. Each code has **Copy Code** and **Copy Link** buttons; the link opens the web client with the code filled in
 
 **Joining a Game:**
@@ -182,7 +183,7 @@ The creator controls who plays on which team by deciding who gets which code:
 2. Pastes the invite code they received from the creator
 3. Clicks "Join Game"
 4. Automatically assigned to Team 0 or Team 1 based on which code was used
-5. Waits for all player slots to fill (2 per team for 2v2, 3 per team for 3v3)
+5. Waits for all player slots to fill (1 per team for 1v1, 2 per team for 2v2, 3 per team for 3v3)
 
 ### Role Assignment Phase
 
@@ -190,6 +191,7 @@ Once all players have joined:
 1. Game transitions from `waiting_for_players` to `in_progress` state
 2. Each team sees the role assignment screen
 3. **Each player assigns their own role** by selecting from available options:
+   - 1v1: Commander (the only role)
    - 2v2 teams: Captain or Huntsman
    - 3v3 teams: Captain, Huntsman, or Engineer
 4. Backend validates that each team has exactly one of each required role
@@ -244,6 +246,15 @@ After robots are spawned:
 ## **Player Roles**
 
 The types and numbers of Robots available to the Player depends on their role
+
+### Roles in One-Person Teams (1v1)
+The single player commands the whole army a two-person team would field.
+
+1. **Commander** has the following Robot types and counts
+* 1 Captain Type
+* 4 Scout Type
+* 2 Defender Type
+* 3 Engineer Type
 
 ### Roles in Two-Person Teams
 Only one of each type is allowed.
