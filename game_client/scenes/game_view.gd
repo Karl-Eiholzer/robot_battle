@@ -745,8 +745,14 @@ func _on_results_received(data: Dictionary) -> void:
 		else:
 			_start_next_turn()
 
-func _on_request_failed(endpoint: String, _status_code: int, body: String) -> void:
-	if endpoint.contains("submit"):
+func _on_request_failed(endpoint: String, status_code: int, body: String) -> void:
+	if endpoint.contains("submit") and status_code == 409:
+		# The turn already went ahead without us (deadline passed, e.g. the tab was
+		# hidden) or we already submitted: catch up from the results instead
+		_show_overlay("Turn time ran out. Catching up...")
+		TurnInput.set_phase(TurnInput.Phase.REVIEWING)
+		poll_timer.start()
+	elif endpoint.contains("submit"):
 		TurnInput.set_phase(TurnInput.Phase.INPUT)
 		submit_btn.disabled = false
 		hint_label.text = "Submit failed: %s" % body
@@ -760,7 +766,10 @@ func _on_request_failed(endpoint: String, _status_code: int, body: String) -> vo
 func _play_replay(replay: Dictionary, full_results: Dictionary) -> void:
 	TurnInput.set_phase(TurnInput.Phase.REVIEWING)
 	var winner = replay.get("winner", null)
-	if winner != null:
+	var forfeit = replay.get("forfeit", null)
+	if winner != null and forfeit != null:
+		_show_overlay("Playing final turn...")
+	elif winner != null:
 		# The overlay would sit right on top of the capture, so narrate in the hint instead
 		hint_label.text = "Final turn: watch the Captain..."
 		_focus_on_capture(replay)
@@ -775,7 +784,7 @@ func _play_replay(replay: Dictionary, full_results: Dictionary) -> void:
 	_hide_overlay()
 
 	if winner != null:
-		_show_game_over(winner)
+		_show_game_over(winner, forfeit)
 	else:
 		replay_btn.disabled = false
 		_start_next_turn()
@@ -868,14 +877,17 @@ func _start_next_turn() -> void:
 
 # Stay on the map after the final replay so players can see (and re-watch) the
 # capture; Submit becomes End Game.
-func _show_game_over(winner: int) -> void:
+func _show_game_over(winner: int, forfeit = null) -> void:
 	_winner = winner
 	TurnInput.set_phase(TurnInput.Phase.GAME_OVER)
 	input_timer.stop()
 	timer_label.text = ""
 	var outcome = "You win!" if winner == GameState.player_team else "You lose."
-	hint_label.text = "Team %d captured the Captain. %s Press Replay Last Turn [R] to watch again, or End Game [Enter] for the results." % [
-		winner, outcome]
+	var how = "Team %d captured the Captain." % winner
+	if forfeit != null:
+		how = "Team %d forfeited after missing too many turns." % int(forfeit)
+	hint_label.text = "%s %s Press Replay Last Turn [R] to watch again, or End Game [Enter] for the results." % [
+		how, outcome]
 
 func _go_to_game_end(winner: int) -> void:
 	GameState.game_state_str = "complete"

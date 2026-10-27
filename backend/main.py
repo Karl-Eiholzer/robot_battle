@@ -2,6 +2,7 @@ from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 import uuid
 import random
+import time
 from datetime import datetime
 import asyncio
 
@@ -223,6 +224,7 @@ async def join_game_by_invite_code(invite_code: str, request: InviteCodeJoinRequ
 @app.get("/game/{game_id}/status", response_model=GameStatusResponse)
 async def get_game_status(
     game_id: str,
+    background_tasks: BackgroundTasks,
     player_id: str = Depends(get_current_player)
 ):
     """
@@ -244,6 +246,8 @@ async def get_game_status(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Player not in this game"
         )
+
+    enforce_turn_deadline(game_id, background_tasks)
 
     # Get game metadata
     game_meta = redis_client.get_game_meta(game_id)
@@ -416,6 +420,7 @@ async def spawn_robots(
         redis_client.store_hex_objects(game_id, [])
 
         redis_client.update_game_state(game_id, "in_progress")
+        redis_client.mark_turn_started(game_id)
     finally:
         redis_client.release_spawn_lock(game_id)
 
@@ -528,6 +533,13 @@ async def submit_move(
             detail="Move already submitted for this turn"
         )
 
+    # The turn deadline passed and the turn is being processed without this player
+    if redis_client.is_turn_claimed(game_id, request.turn):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Turn deadline passed - the turn was processed without your moves"
+        )
+
     validation_errors = []
 
     # Validate new-format actions if provided
@@ -555,6 +567,7 @@ async def submit_move(
         }
 
     redis_client.store_move(game_id, request.turn, player_id, move_data)
+    redis_client.reset_missed_turns(game_id, player_id)
 
     # Count total moves submitted
     moves_submitted = redis_client.count_turn_moves(game_id, request.turn)
@@ -562,8 +575,9 @@ async def submit_move(
 
     processing = False
 
-    # If all moves are in, trigger turn processing
-    if moves_submitted >= moves_required:
+    # If all moves are in, trigger turn processing (the claim stops a
+    # concurrent deadline check or submission from processing it twice)
+    if moves_submitted >= moves_required and redis_client.claim_turn_processing(game_id, request.turn):
         # Update state to processing
         redis_client.update_game_state(game_id, "processing_turn")
         processing = True
@@ -587,6 +601,7 @@ async def submit_move(
 async def get_turn_results(
     game_id: str,
     turn: int,
+    background_tasks: BackgroundTasks,
     player_id: str = Depends(get_current_player)
 ):
     """
@@ -609,6 +624,9 @@ async def get_turn_results(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Player not in this game"
         )
+
+    # Waiting players poll here, so this is where an expired turn gets processed
+    enforce_turn_deadline(game_id, background_tasks)
 
     # Check if results exist for this turn
     results = redis_client.get_turn_results(game_id, turn)
@@ -652,6 +670,98 @@ async def get_turn_results(
         )
 
 
+# ==================== Turn Deadline ====================
+
+def enforce_turn_deadline(game_id: str, background_tasks: BackgroundTasks):
+    """
+    Process the current turn if its deadline has passed
+
+    - Deadline = turn start + allowance for the client to reach input
+      + input_time + turn_grace_period
+    - Players who haven't submitted get an empty turn (their robots wait)
+      and a missed turn on their count
+    - There is no scheduler: this runs when someone polls, which is exactly
+      when a player is waiting on the others
+    """
+    game_meta = redis_client.get_game_meta(game_id)
+    if not game_meta or game_meta["state"] != "in_progress" or not game_meta["turn_started_at"]:
+        return
+
+    game_vars = redis_client.get_game_variables(game_id) or GameVariables().model_dump()
+    input_time = game_vars.get("input_time", 120)
+    if input_time <= 0:
+        return  # No time limit on this game
+
+    deadline = (game_meta["turn_started_at"] + Config.TURN_START_ALLOWANCE
+                + input_time + game_vars.get("turn_grace_period", 15))
+    if time.time() < deadline:
+        return
+
+    turn = game_meta["current_turn"]
+    if not redis_client.claim_turn_processing(game_id, turn):
+        return
+
+    submitted = redis_client.get_turn_moves(game_id, turn)
+    for pid in redis_client.get_game_players(game_id):
+        if pid not in submitted:
+            redis_client.store_move(game_id, turn, pid, {
+                "turn": turn,
+                "actions": [],
+                "missed": True,
+                "submitted_at": datetime.utcnow().isoformat()
+            })
+            redis_client.record_missed_turn(game_id, pid)
+
+    redis_client.update_game_state(game_id, "processing_turn")
+    background_tasks.add_task(process_turn, game_id, turn)
+
+
+def find_forfeiting_team(game_id: str):
+    """
+    Return the team that forfeits, or None
+
+    A team forfeits when every one of its players has missed max_missed_turns
+    turns in a row. If both teams qualify there is no one left to win, so
+    neither forfeits (the game expires on its own).
+    """
+    game_vars = redis_client.get_game_variables(game_id) or GameVariables().model_dump()
+    max_missed = game_vars.get("max_missed_turns", 3)
+    if max_missed <= 0:
+        return None
+
+    missed = redis_client.get_missed_turns(game_id)
+    team_players = {0: [], 1: []}
+    for pid in redis_client.get_game_players(game_id):
+        team = redis_client.get_player_team(game_id, pid)
+        if team in team_players:
+            team_players[team].append(pid)
+
+    forfeiting = [
+        team for team, players in team_players.items()
+        if players and all(missed.get(pid, 0) >= max_missed for pid in players)
+    ]
+    return forfeiting[0] if len(forfeiting) == 1 else None
+
+
+def apply_forfeit(game_id: str, turn: int, results: dict, forfeiting_team: int):
+    """Record a forfeit as this turn's win, in both the results and the replay"""
+    winner = 1 - forfeiting_team
+    results["winner"] = winner
+    results.setdefault("events", []).append({
+        "type": "forfeit",
+        "forfeiting_team": forfeiting_team,
+        "winning_team": winner,
+        "message": f"Team {forfeiting_team} forfeits after missing too many turns. Team {winner} wins!"
+    })
+
+    replay = redis_client.get_turn_replay(game_id, turn)
+    if replay is not None:
+        replay["winner"] = winner
+        replay["forfeit"] = forfeiting_team
+        redis_client.store_turn_replay(game_id, turn, replay)
+        results["replay"] = replay
+
+
 # ==================== Background Task: Process Turn ====================
 
 async def process_turn(game_id: str, turn: int):
@@ -674,6 +784,11 @@ async def process_turn(game_id: str, turn: int):
         # Calculate turn results using game logic
         results = calculate_turn_results(moves, game_id)
 
+        if results.get("winner") is None:
+            forfeiting_team = find_forfeiting_team(game_id)
+            if forfeiting_team is not None:
+                apply_forfeit(game_id, turn, results, forfeiting_team)
+
         # Store results
         redis_client.store_turn_results(game_id, turn, results)
 
@@ -688,6 +803,7 @@ async def process_turn(game_id: str, turn: int):
             redis_client.increment_turn(game_id)
             redis_client.flip_initiative(game_id)
             redis_client.update_game_state(game_id, "in_progress")
+            redis_client.mark_turn_started(game_id)
 
             # Stunned robots recover at the start of each turn
             robots = redis_client.get_robots(game_id)
@@ -702,8 +818,10 @@ async def process_turn(game_id: str, turn: int):
         import traceback
         traceback.print_exc()
 
-        # Set game back to in_progress so players can retry
+        # Set game back to in_progress and release the claim so the turn
+        # deadline can retry processing
         redis_client.update_game_state(game_id, "in_progress")
+        redis_client.release_turn_claim(game_id, turn)
 
 
 # ==================== Root Endpoint ====================

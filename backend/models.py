@@ -59,6 +59,8 @@ class GameVariables(BaseModel):
     input_time: int = Field(default=120, description="Seconds for action input")
     review_time: int = Field(default=40, description="Seconds to review replay")
     starting_energy: int = Field(default=2, ge=0, le=3, description="Starting energy 0-3")
+    turn_grace_period: int = Field(default=15, ge=0, description="Seconds past input_time before the server processes a turn without missing players")
+    max_missed_turns: int = Field(default=3, ge=0, description="Consecutive missed turns after which a team whose players all missed them forfeits (0 = never)")
 
 
 # ==================== Player Roles ====================

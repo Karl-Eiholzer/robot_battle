@@ -1,5 +1,6 @@
 import redis
 import json
+import time
 from typing import Optional, Dict, List, Any
 from config import Config
 
@@ -47,7 +48,8 @@ class RedisClient:
             "max_players": int(data.get("max_players", 4)),
             "created_at": data.get("created_at"),
             "initiative_team": int(data.get("initiative_team", 0)),
-            "team_size": int(data.get("team_size", 2))
+            "team_size": int(data.get("team_size", 2)),
+            "turn_started_at": float(data.get("turn_started_at", 0))
         }
 
     def set_game_meta(self, game_id: str, data: Dict[str, Any], ttl: int = None):
@@ -99,6 +101,26 @@ class RedisClient:
         key = f"game:{game_id}:meta"
         self.client.hset(key, "initiative_team", str(new_initiative))
         return new_initiative
+
+    def mark_turn_started(self, game_id: str):
+        """Record when the current turn's input phase began (for the turn deadline)"""
+        key = f"game:{game_id}:meta"
+        self.client.hset(key, "turn_started_at", str(time.time()))
+
+    def claim_turn_processing(self, game_id: str, turn: int) -> bool:
+        """Atomically claim the right to process a turn. Only the first caller
+        (last submission or deadline enforcement) gets True."""
+        key = f"game:{game_id}:turn:{turn}:claimed"
+        claimed = bool(self.client.set(key, "1", nx=True))
+        if claimed:
+            self._refresh_game_ttl(game_id)
+        return claimed
+
+    def release_turn_claim(self, game_id: str, turn: int):
+        self.client.delete(f"game:{game_id}:turn:{turn}:claimed")
+
+    def is_turn_claimed(self, game_id: str, turn: int) -> bool:
+        return self.client.exists(f"game:{game_id}:turn:{turn}:claimed") > 0
 
     def _refresh_game_ttl(self, game_id: str):
         """Refresh TTL for all game-related keys"""
@@ -376,6 +398,26 @@ class RedisClient:
         """Count how many moves have been submitted for a turn"""
         key = f"game:{game_id}:turn:{turn}:moves"
         return self.client.hlen(key)
+
+    # ==================== Missed Turns ====================
+
+    def record_missed_turn(self, game_id: str, player_id: str) -> int:
+        """Increment a player's consecutive missed-turn count"""
+        key = f"game:{game_id}:missed_turns"
+        count = self.client.hincrby(key, player_id, 1)
+        self._refresh_game_ttl(game_id)
+        return count
+
+    def reset_missed_turns(self, game_id: str, player_id: str):
+        """A submission ends the player's run of missed turns"""
+        key = f"game:{game_id}:missed_turns"
+        self.client.hset(key, player_id, 0)
+        self._refresh_game_ttl(game_id)
+
+    def get_missed_turns(self, game_id: str) -> Dict[str, int]:
+        """player_id -> consecutive missed turns"""
+        key = f"game:{game_id}:missed_turns"
+        return {pid: int(n) for pid, n in self.client.hgetall(key).items()}
 
     # ==================== Turn Results ====================
 
