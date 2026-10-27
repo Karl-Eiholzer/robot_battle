@@ -88,6 +88,7 @@ func initialize_from_create_response(data: Dictionary) -> void:
 	team_0_invite_code = data.get("team_0_invite_code", "")
 	team_1_invite_code = data.get("team_1_invite_code", "")
 	game_state_str = data.get("state", "waiting_for_players")
+	_set_team_size_from_max_players(data)
 	save_state()
 
 func initialize_from_join_response(data: Dictionary) -> void:
@@ -97,7 +98,14 @@ func initialize_from_join_response(data: Dictionary) -> void:
 	player_team = data.get("team", -1)  # Team assigned by backend
 	game_state_str = data.get("state", "waiting_for_players")
 	map_data = data.get("map", {})
+	_set_team_size_from_max_players(data)
 	save_state()
+
+# Role assignment needs team_size before initial_state is available
+func _set_team_size_from_max_players(data: Dictionary) -> void:
+	var max_players := int(data.get("max_players", 0))
+	if max_players > 0:
+		game_variables["team_size"] = max_players / 2
 
 func initialize_from_initial_state(data: Dictionary) -> void:
 	current_turn = data.get("current_turn", 0)
@@ -179,6 +187,7 @@ func save_state() -> void:
 	cfg.set_value("session", "player_team", player_team)
 	cfg.set_value("session", "team_0_invite_code", team_0_invite_code)
 	cfg.set_value("session", "team_1_invite_code", team_1_invite_code)
+	cfg.set_value("session", "team_size", game_variables.get("team_size", 2))
 	cfg.save(SAVE_PATH)
 
 func load_saved_state() -> void:
@@ -191,6 +200,7 @@ func load_saved_state() -> void:
 		player_team = cfg.get_value("session", "player_team", -1)
 		team_0_invite_code = cfg.get_value("session", "team_0_invite_code", "")
 		team_1_invite_code = cfg.get_value("session", "team_1_invite_code", "")
+		game_variables["team_size"] = cfg.get_value("session", "team_size", 2)
 
 func clear_saved_state() -> void:
 	var cfg = ConfigFile.new()
