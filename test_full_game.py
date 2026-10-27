@@ -542,6 +542,82 @@ class FullGameTester:
 
         return True
 
+    # ==================== Test: Turn Deadline and Forfeit ====================
+
+    def test_turn_deadline_forfeit(self):
+        """One player stops submitting: turns go ahead at the deadline, then they forfeit"""
+        self.log_section("Turn Deadline and Forfeit Test")
+
+        # input_time 1 + grace 0 + 10s start allowance: each deadline is ~11s
+        self.log_test("Create 1v1 game with a short turn timer")
+        resp = self.post("/game/create", {
+            "max_players": 2,
+            "map_config": {"width": 10, "height": 10},
+            "game_variables": {"team_size": 1, "map_size": "small", "input_time": 1,
+                               "turn_grace_period": 0, "max_missed_turns": 3}
+        })
+        if resp is None or resp.status_code != 200:
+            self.log_error(f"Failed to create game: {resp.text if resp is not None else None}")
+            return False
+        game = resp.json()
+        game_id = game["game_id"]
+        creator_key = game["api_key"]
+        opponent = self.join_game_by_code(game["team_1_invite_code"], "Leaver")
+        if not opponent:
+            self.log_error("Opponent failed to join")
+            return False
+        self.assign_roles(game_id, 0, {game["creator_player_id"]: "commander"}, creator_key)
+        self.assign_roles(game_id, 1, {opponent["player_id"]: "commander"}, opponent["api_key"])
+        spawn_result = self.spawn_robots(game_id, creator_key)
+        if not spawn_result or spawn_result.get("error"):
+            self.log_error(f"Spawn failed: {spawn_result}")
+            return False
+        self.log_success(f"Game ready: {game_id}")
+
+        results = None
+        for turn in range(3):
+            self.log_test(f"Turn {turn}: opponent doesn't submit")
+            result = self.submit_moves(game_id, turn, [], creator_key)
+            if not result or result.get("error"):
+                self.log_error(f"Creator submit failed: {result}")
+                return False
+            if result["processing"]:
+                self.log_error("Turn processed before the opponent submitted")
+                return False
+
+            # Polling past the deadline is what makes the server process the turn
+            results = self.poll_results(game_id, turn, creator_key, timeout=30)
+            if not results:
+                self.log_error(f"Turn {turn} was not processed after the deadline")
+                return False
+            self.log_success(f"Turn {turn} processed at the deadline without the opponent")
+
+            if turn == 0:
+                late = self.submit_moves(game_id, 0, [], opponent["api_key"])
+                if late and late.get("status_code") == 409:
+                    self.log_success("Late submission rejected with 409")
+                else:
+                    self.log_error(f"Expected 409 for late submission, got {late}")
+
+            if turn < 2 and results.get("winner") is not None:
+                self.log_error(f"Game ended early on turn {turn}")
+                return False
+
+        self.log_test("Opponent forfeits after 3 missed turns")
+        replay = results.get("replay") or {}
+        if results.get("winner") == 0 and replay.get("forfeit") == 1:
+            self.log_success("Team 1 forfeited; team 0 wins")
+        else:
+            self.log_error(f"Expected team 1 forfeit, got winner={results.get('winner')} "
+                           f"forfeit={replay.get('forfeit')}")
+            return False
+        if results.get("state") == "complete":
+            self.log_success("Game is complete")
+        else:
+            self.log_error(f"Expected state complete, got {results.get('state')}")
+
+        return True
+
     # ==================== Test: 3v3 Game Flow ====================
 
     def test_3v3_game_flow(self):
@@ -998,6 +1074,7 @@ class FullGameTester:
         results = []
         results.append(("2v2 Game Flow", self.test_2v2_game_flow()))
         results.append(("1v1 Game Flow", self.test_1v1_game_flow()))
+        results.append(("Turn Deadline and Forfeit", self.test_turn_deadline_forfeit()))
         results.append(("3v3 Game Flow", self.test_3v3_game_flow()))
         results.append(("Captain Capture Win", self.test_captain_capture_win()))
         results.append(("Deploy Actions", self.test_deploy_actions()))

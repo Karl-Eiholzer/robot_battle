@@ -62,7 +62,8 @@ web: uvicorn main:app --host 0.0.0.0 --port $PORT
 ```
 game:{game_id}:meta                → Hash: state, current_turn, player_count,
                                             max_players, created_at,
-                                            initiative_team, team_size
+                                            initiative_team, team_size,
+                                            turn_started_at (epoch seconds)
 game:{game_id}:players             → Set:  player_ids
 game:{game_id}:player_info:{pid}   → Hash: player_name, team
 game:{game_id}:map                 → String: JSON map data
@@ -73,6 +74,9 @@ game:{game_id}:hex_objects         → String: JSON list of HexObject
 game:{game_id}:turn:{n}:moves      → Hash:  player_id → move_data_json
 game:{game_id}:turn:{n}:results    → String: JSON turn result data
 game:{game_id}:turn:{n}:replay     → String: JSON TurnReplay data
+game:{game_id}:turn:{n}:claimed    → String: set (NX) by whichever of the last
+                                     submission or the turn deadline processes the turn
+game:{game_id}:missed_turns        → Hash:  player_id → consecutive missed turns
 
 player:{player_id}:current_game    → String: game_id
 player:{player_id}:api_key         → String: api_key  (player → key)
@@ -84,7 +88,7 @@ api_key:{api_key}                  → String: player_id (key → player, used f
 - `waiting_for_players` — accepting joins
 - `in_progress` — active, accepting move submissions
 - `processing_turn` — turn processing background task running
-- `complete` — game finished (captain captured)
+- `complete` — game finished (captain captured or a team forfeited)
 
 ### TTL
 
@@ -106,7 +110,9 @@ Sent at game creation; stored in `game:{game_id}:variables`.
   "map_size": "medium",     // "small", "medium", "large"
   "input_time": 90,         // seconds for action input phase
   "review_time": 40,        // seconds to review replay
-  "starting_energy": 2      // initial energy per robot (0-3)
+  "starting_energy": 2,     // initial energy per robot (0-3)
+  "turn_grace_period": 15,  // seconds past input_time before the turn deadline
+  "max_missed_turns": 3     // consecutive missed turns before a team forfeits (0 = never)
 }
 ```
 
@@ -500,14 +506,16 @@ The legacy `moves` field (list of `MoveAction`) is still accepted for backward c
 **Backend logic:**
 - Validates turn number matches `current_turn`
 - Validates actions against robot ownership and move limits
-- Stores in `game:{game_id}:turn:{n}:moves`
-- If all players have submitted: sets state to `processing_turn`, enqueues background task
+- Rejects with 409 if the turn deadline has passed and the turn is already being processed
+- Stores in `game:{game_id}:turn:{n}:moves` and resets the player's missed-turn count
+- If all players have submitted and the turn can be claimed: sets state to `processing_turn`, enqueues background task
 
 ---
 
 ### `GET /game/{game_id}/results`
 
 Requires authentication. Poll after submitting; call every 3 seconds until `ready == true`.
+Polling also enforces the turn deadline (see Turn Processing), as does `GET /game/{game_id}/status`.
 
 **Query parameter:** `turn` (int)
 
@@ -544,6 +552,7 @@ Requires authentication. Poll after submitting; call every 3 seconds until `read
 
 `updated_robots` — same fog-of-war split as `initial_state`: full data for own robots, partial for visible enemies.
 `winner` — `null` or the winning team number (0 or 1).
+When a team forfeits, `replay.forfeit` is the forfeiting team and `events` includes a `forfeit` event.
 
 ---
 
@@ -554,10 +563,32 @@ Requires authentication. Poll after submitting; call every 3 seconds until `read
 When the last player submits their actions:
 
 ```python
-if moves_submitted >= moves_required:
+if moves_submitted >= moves_required and redis_client.claim_turn_processing(game_id, request.turn):
     redis_client.update_game_state(game_id, "processing_turn")
     background_tasks.add_task(process_turn, game_id, request.turn)
 ```
+
+The claim (`SET NX` on `game:{game_id}:turn:{n}:claimed`) makes sure a turn is processed once, whether the last submission or the turn deadline gets there first.
+
+### Turn Deadline
+
+Players who leave (closed window, hidden tab, sleeping laptop) would otherwise stall the game forever, so each turn has a deadline:
+
+```
+deadline = turn_started_at + TURN_START_ALLOWANCE (10s) + input_time + turn_grace_period
+```
+
+`turn_started_at` is set when robots spawn and whenever a turn finishes processing. `TURN_START_ALLOWANCE` (config.py) covers the client's results poll and replay animation before its input timer starts.
+
+There is no scheduler. `enforce_turn_deadline()` runs on every `/results` and `/status` poll, which is when the players still in the game are waiting. Once the deadline passes it claims the turn, stores an empty plan (robots wait) for each player who hasn't submitted, adds one to their count in `game:{game_id}:missed_turns`, and enqueues `process_turn`. A game with `input_time` 0 has no deadline.
+
+A player whose client submits after that gets a 409 and catches up by polling the turn's results.
+
+### Forfeit
+
+Any submission resets a player's missed-turn count to 0, including the empty plan an open client auto-submits when its timer runs out. After processing a turn with no winner, the server checks each team: if every player on a team has missed `max_missed_turns` turns in a row, that team forfeits and the other team wins. The results get `winner`, a `forfeit` event, and `replay.forfeit`. If both teams qualify at once, neither forfeits (nobody is left to win) and the game expires through its TTL. `max_missed_turns` 0 turns forfeits off.
+
+In 2v2 and 3v3, one teammate leaving does not forfeit the team: their robots wait each turn while the rest of the team plays on.
 
 ### Background Task
 
@@ -567,6 +598,10 @@ async def process_turn(game_id: str, turn: int):
 
     moves = redis_client.get_turn_moves(game_id, turn)
     results = calculate_turn_results(moves, game_id)
+    if results.get("winner") is None:
+        forfeiting_team = find_forfeiting_team(game_id)
+        if forfeiting_team is not None:
+            apply_forfeit(game_id, turn, results, forfeiting_team)
     redis_client.store_turn_results(game_id, turn, results)
 
     winner = check_win_condition(game_id)
@@ -577,6 +612,7 @@ async def process_turn(game_id: str, turn: int):
         redis_client.increment_turn(game_id)
         redis_client.flip_initiative(game_id)
         redis_client.update_game_state(game_id, "in_progress")
+        redis_client.mark_turn_started(game_id)
         # Reset per-turn robot fields
         for robot in redis_client.get_robots(game_id):
             robot["state"] = "active"     # stunned robots recover

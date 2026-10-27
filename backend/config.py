@@ -21,6 +21,10 @@ class Config:
     TTL_COMPLETED_GAME = 1 * 60 * 60  # 1 hour
     TTL_PLAYER_SESSION = 48 * 60 * 60  # 48 hours
 
+    # Turn deadline: time a client needs after a turn starts before its input
+    # timer runs (results poll interval + replay animation + latency)
+    TURN_START_ALLOWANCE = 10
+
     # Game settings
     DEFAULT_MAX_PLAYERS = 4
     MIN_PLAYERS = 2
